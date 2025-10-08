@@ -1,414 +1,18 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quản Lý Tiến Độ Đại Tu Lò Hơi (Total & Detail)</title>
-
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script> 
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f9;
-        }
-        .container {
-            max-width: 98%;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-        }
-        h1, h2 {
-            color: #333;
-            border-bottom: 2px solid #ccc;
-            padding-bottom: 10px;
-            margin-top: 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: center;
-            font-size: 14px;
-        }
-        th {
-            background-color: #007bff;
-            color: white;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-        #total-data-body tr:hover {
-            background-color: #e2e6ea;
-            cursor: pointer;
-        }
-        #data-body tr:hover {
-            background-color: #e2e6ea;
-            cursor: pointer;
-        }
-        .header-group {
-            background-color: #5c6bc0;
-            color: white;
-        }
-        .plan-group { background-color: #dc3545; color: white; }
-        .lam-group { background-color: #28a745; color: white; }
-        .conlai-group { background-color: #ffc107; color: #333; }
-        .percent-group { background-color: #17a2b8; color: white; }
-        .total-row {
-            font-weight: bold;
-            background-color: #007bff;
-            color: white;
-        }
-        /* Form và nút */
-        .form-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            min-width: 100px;
-        }
-        .form-group.full-width {
-            flex-grow: 1;
-        }
-        .form-group label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-size: 12px;
-            color: #555;
-        }
-        .form-group input, .form-group select {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-            transition: background-color 0.3s;
-        }
-        .btn-primary {
-            background-color: #007bff;
-            color: white;
-        }
-        .btn-primary:hover {
-            background-color: #0056b3;
-        }
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-        .btn-secondary:hover {
-            background-color: #5a6268;
-        }
-        .import-export-section {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #e9ecef;
-            flex-wrap: wrap;
-        }
-        .file-input-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        /* Chi tiết */
-        #view-detail, #view-total {
-            padding: 10px 0;
-        }
-        #view-detail {
-            display: none; /* Mặc định ẩn view chi tiết */
-        }
-        #detail-header {
-            font-size: 1.5em;
-            margin-bottom: 15px;
-            color: #007bff;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>Quản Lý Tiến Độ Đại Tu Lò Hơi</h1>
-    
-    <div id="hidden-file-management" class="import-export-section">
-        <div class="file-input-wrapper">
-            <label for="plan-file-input" style="font-weight: bold;">Import Kế hoạch (Tổng hợp):</label>
-            <input type="file" id="plan-file-input" accept=".xlsx, .xls" onchange="handlePlanUpload(event)" style="display: none;">
-            <button onclick="document.getElementById('plan-file-input').click()" class="btn-primary">Chọn File Kế Hoạch (.xlsx)</button>
-        </div>
-        <div class="file-input-wrapper">
-            <button onclick="downloadDataAsExcel()" class="btn-secondary">Export Dữ liệu Chi tiết (.xlsx)</button>
-        </div>
-    </div>
-
-
-    <div id="view-total">
-        <h2>Tiến Độ Tổng Hợp Các Khu Vực</h2>
-        <p style="font-style: italic;">(Click vào dòng để xem hoặc cập nhật chi tiết)</p>
-        <div style="overflow-x: auto;">
-            <table id="total-data-table">
-                <thead>
-                    <tr>
-                        <th rowspan="2">Khu Vực</th>
-                        <th colspan="3" class="plan-group">Kế Hoạch CẦN LÀM</th>
-                        <th colspan="3" class="lam-group">Khối Lượng ĐÃ LÀM</th>
-                        <th colspan="3" class="conlai-group">CÒN LẠI</th>
-                        <th colspan="2" class="percent-group">% Hoàn Thành</th>
-                        <th rowspan="2">Ghi Chú</th>
-                    </tr>
-                    <tr>
-                        <th class="plan-group">Đoạn Ống</th>
-                        <th class="plan-group">Mối BP</th>
-                        <th class="plan-group">Tổng Mối Hàn</th>
-                        <th class="lam-group">Đoạn Ống</th>
-                        <th class="lam-group">Mối BP</th>
-                        <th class="lam-group">Tổng Mối Hàn</th>
-                        <th class="conlai-group">Đoạn Ống</th>
-                        <th class="conlai-group">Mối BP</th>
-                        <th class="conlai-group">Tổng Mối Hàn</th>
-                        <th class="percent-group">% Đoạn Ống</th>
-                        <th class="percent-group">% Mối Hàn</th>
-                    </tr>
-                </thead>
-                <tbody id="total-data-body">
-                    </tbody>
-                <tfoot>
-                    </tfoot>
-            </table>
-        </div>
-    </div>
-
-    <div id="view-detail">
-        <h2 id="detail-header">CHI TIẾT TIẾN ĐỘ KHU VỰC:</h2>
-        
-        <button onclick="showTotalView()" class="btn-secondary" style="margin-bottom: 15px;">&larr; Quay lại Bảng Tổng Hợp</button>
-        
-        <div class="import-export-section" style="background-color: #e6f7ff; border-color: #b3e0ff;">
-            <div class="file-input-wrapper">
-                <label for="detail-file-input" style="font-weight: bold;">Import Chi tiết cho khu vực <span id="current-khuVuc-update" style="color:#007bff;"></span>:</label>
-                <input type="file" id="detail-file-input" accept=".xlsx, .xls" onchange="handleDetailUpload(event)" style="display: none;">
-                <button onclick="document.getElementById('detail-file-input').click()" class="btn-primary">Chọn File Chi Tiết (.xlsx)</button>
-            </div>
-            <div class="form-group">
-                <label for="filterHangMuc">Lọc Hạng Mục:</label>
-                <input type="text" id="filterHangMuc" onkeyup="applyDetailFilters()" placeholder="Nhập tên hạng mục...">
-            </div>
-        </div>
-
-        <h3>Cập Nhật Tiến Độ (Click vào hàng trong bảng để chỉnh sửa)</h3>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="stt">STT</label>
-                <input type="number" id="stt" value="1" disabled style="background: #f8f9fa;">
-            </div>
-            <div class="form-group full-width">
-                <label for="hangMuc">Hạng Mục <span style="color:red;">*</span></label>
-                <input type="text" id="hangMuc" placeholder="Ví dụ: TQNTG T5/ Giàn 5-1">
-                <input type="hidden" id="khuVuc" value="">
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <div class="form-group">
-                <label for="duongKinh">ĐK (mm)</label>
-                <input type="number" step="0.01" id="duongKinh" value="50.80">
-            </div>
-            <div class="form-group">
-                <label for="chieuDayDanhDinh">CD DĐ (mm)</label>
-                <input type="number" step="0.01" id="chieuDayDanhDinh" value="4.57">
-            </div>
-            <div class="form-group">
-                <label for="chieuDayThuc">CD Thực (mm)</label>
-                <input type="number" step="0.01" id="chieuDayThuc" value="3.41">
-            </div>
-            <div class="form-group">
-                <label for="chieuDaiDoanOngThayThe">Chiều Dài Thay (m)</label>
-                <input type="number" step="0.1" id="chieuDaiDoanOngThayThe" value="1.0">
-            </div>
-            <div class="form-group">
-                <label for="phuongAn">Phương án</label>
-                <select id="phuongAn">
-                    <option value="Cắt thay">Cắt thay</option>
-                    <option value="Hàn đắp">Hàn đắp</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="queHanSuDung">Que hàn</label>
-                <input type="text" id="queHanSuDung" value="ER80S-B2">
-            </div>
-        </div>
-        
-        <div class="form-row" style="border-top: 1px solid #ddd; padding-top: 10px;">
-            <div class="form-group">
-                <label for="khoiLuongCanLam" style="color: #dc3545;">KL Đoạn Ống CẦN</label>
-                <input type="number" id="khoiLuongCanLam" value="1" min="0">
-            </div>
-            <div class="form-group">
-                <label for="soMoiHanCanLam" style="color: #dc3545;">Tổng Mối Hàn CẦN</label>
-                <input type="number" id="soMoiHanCanLam" value="2" min="0">
-            </div>
-            <div class="form-group">
-                <label for="soMoiBPCanLam" style="color: #dc3545;">Mối BP CẦN</label>
-                <input type="number" id="soMoiBPCanLam" value="0" min="0">
-            </div>
-
-            <div class="form-group" style="border-left: 1px solid #ccc; padding-left: 10px;">
-                <label for="catLam" style="color: #28a745;">ĐÃ LÀM: Cắt</label>
-                <input type="number" id="catLam" value="0" min="0">
-            </div>
-            <div class="form-group">
-                <label for="hanMoi1Lam" style="color: #28a745;">ĐÃ LÀM: Hàn Mối 1</label>
-                <input type="number" id="hanMoi1Lam" value="0" min="0">
-            </div>
-            <div class="form-group">
-                <label for="hanMoi2Lam" style="color: #28a745;">ĐÃ LÀM: Hàn Mối 2</label>
-                <input type="number" id="hanMoi2Lam" value="0" min="0">
-            </div>
-            <div class="form-group">
-                <label for="soMoiBPLam" style="color: #28a745;">ĐÃ LÀM: Mối BP</label>
-                <input type="number" id="soMoiBPLam" value="0" min="0">
-            </div>
-            <div class="form-group">
-                <label for="soDoanOngLam" style="color: #28a745;">ĐÃ LÀM: Đoạn Ống</label>
-                <input type="number" id="soDoanOngLam" value="0" min="0">
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <div class="form-group full-width">
-                <label for="ghiChu">Ghi Chú</label>
-                <input type="text" id="ghiChu" placeholder="Nhập ghi chú">
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <button id="add-row-btn" class="btn-primary">Lưu (Thêm mới/Cập nhật)</button>
-            <button onclick="resetForm()" class="btn-secondary">Reset Form</button>
-        </div>
-
-
-        <h3>Bảng Dữ Liệu Chi Tiết <span style="font-size: 0.8em; color: #555;">(Click để Load vào Form)</span></h3>
-        <div style="overflow-x: auto;">
-            <table id="detail-data-table">
-                <thead>
-                    <tr>
-                        <th rowspan="2">STT</th>
-                        <th rowspan="2" style="min-width: 250px;">Hạng Mục</th>
-                        <th colspan="4" class="header-group">Thông Số Vật Tư</th>
-                        <th colspan="2" class="header-group">Phương Án</th>
-                        <th colspan="3" class="plan-group">Kế Hoạch CẦN LÀM</th>
-                        <th colspan="5" class="lam-group">Khối Lượng ĐÃ LÀM</th>
-                        <th rowspan="2">Ghi Chú</th>
-                    </tr>
-                    <tr>
-                        <th class="header-group">ĐK (mm)</th>
-                        <th class="header-group">CD DĐ (mm)</th>
-                        <th class="header-group">CD Thực (mm)</th>
-                        <th class="header-group">CD Thay (m)</th>
-                        <th class="header-group">Phương án</th>
-                        <th class="header-group">Que hàn</th>
-                        <th class="plan-group">KL Đoạn Ống</th>
-                        <th class="plan-group">Tổng Mối Hàn</th>
-                        <th class="plan-group">Mối BP</th>
-                        <th class="lam-group">Cắt</th>
-                        <th class="lam-group">Hàn Mối 1</th>
-                        <th class="lam-group">Hàn Mối 2</th>
-                        <th class="lam-group">Mối BP</th>
-                        <th class="lam-group">Đoạn Ống</th>
-                    </tr>
-                </thead>
-                <tbody id="data-body">
-                    </tbody>
-                <tfoot id="data-tfoot">
-                    </tfoot>
-            </table>
-        </div>
-    </div>
-</div>
-
 <script>
-    // DỮ LIỆU KHỞI TẠO TỔNG HỢP (totalData): ĐÃ CẬP NHẬT CHÍNH XÁC THEO FILE ẢNH MỚI NHẤT
+    // DỮ LIỆU KHỞI TẠO TỔNG HỢP (totalData)
     let totalData = [
-        // 1. Quá nhiệt trung gian
         {"khuVuc": "Quá nhiệt trung gian", "soDoanOngCan": 167, "soMoiBPCan": 141, "tongMoiHanCan": 467, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
-        // 2. Quá nhiệt cấp 1
         {"khuVuc": "Quá nhiệt cấp 1", "soDoanOngCan": 97, "soMoiBPCan": 180, "tongMoiHanCan": 373, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
-        // 3. Quá nhiệt cấp 3
         {"khuVuc": "Quá nhiệt cấp 3", "soDoanOngCan": 422, "soMoiBPCan": 0, "tongMoiHanCan": 844, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
-        // 4. Bộ hâm nước
         {"khuVuc": "Bộ hâm nước", "soDoanOngCan": 115, "soMoiBPCan": 62, "tongMoiHanCan": 292, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
-        // 5. Quá nhiệt hộp: Trần
         {"khuVuc": "Quá nhiệt hộp: Trần", "soDoanOngCan": 8, "soMoiBPCan": 8, "tongMoiHanCan": 20, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
-        // 6. Ống sinh hơi (Dữ liệu trống trong file, đặt về 0)
         {"khuVuc": "Ống sinh hơi", "soDoanOngCan": 0, "soMoiBPCan": 0, "tongMoiHanCan": 0, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
-        // 7. Phục hồi giàn 82
         {"khuVuc": "Phục hồi giàn 82", "soDoanOngCan": 40, "soMoiBPCan": 63, "tongMoiHanCan": 101, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
     ];
 
     let detailData = [
-        // Dữ liệu chi tiết mẫu cho Quá nhiệt trung gian
-        {
-            "khuVuc":"Quá nhiệt trung gian", 
-            "hangMuc":"TQNTG T5/ Giàn 5-1", 
-            "duongKinh":50.8, 
-            "chieuDayDanhDinh":4.19, 
-            "chieuDayThuc":3.14,
-            "chieuDaiDoanOngThayThe": 2.5, 
-            "phuongAn":"Cắt thay",
-            "queHanSuDung":"ER70S-6",
-            "khoiLuongCanLam":1,
-            "soMoiHanCanLam":2, 
-            "soMoiBPCanLam":1, 
-            "catLam":1,
-            "hanMoi1Lam":1,
-            "hanMoi2Lam":0,
-            "soMoiBPLam":1,
-            "soDoanOngLam":1,
-            "ghiChu":"Hoàn thành cắt và hàn mối 1"
-        },
-        // Dữ liệu chi tiết mẫu cho Quá nhiệt cấp 1
-        {
-            "khuVuc":"Quá nhiệt cấp 1", 
-            "hangMuc":"TQNC1 T5/ Giàn 5-4", 
-            "duongKinh":50.8, 
-            "chieuDayDanhDinh":4.57, 
-            "chieuDayThuc":3.4,
-            "chieuDaiDoanOngThayThe": 1.2, 
-            "phuongAn":"Cắt thay",
-            "queHanSuDung":"ER80S-B2",
-            "khoiLuongCanLam":1,
-            "soMoiHanCanLam":2,
-            "soMoiBPCanLam":0, 
-            "catLam":1,
-            "hanMoi1Lam":1,
-            "hanMoi2Lam":1,
-            "soMoiBPLam":0,
-            "soDoanOngLam":1,
-            "ghiChu":"Đã hàn xong"
-        },
+        {"khuVuc":"Quá nhiệt trung gian", "hangMuc":"TQNTG T5/ Giàn 5-1", "duongKinh":50.8, "chieuDayDanhDinh":4.19, "chieuDayThuc":3.14,"chieuDaiDoanOngThayThe": 2.5, "phuongAn":"Cắt thay","queHanSuDung":"ER70S-6","khoiLuongCanLam":1,"soMoiHanCanLam":2, "soMoiBPCanLam":1, "catLam":1,"hanMoi1Lam":1,"hanMoi2Lam":0,"soMoiBPLam":1,"soDoanOngLam":1,"ghiChu":"Hoàn thành cắt và hàn mối 1"},
+        {"khuVuc":"Quá nhiệt cấp 1", "hangMuc":"TQNC1 T5/ Giàn 5-4", "duongKinh":50.8, "chieuDayDanhDinh":4.57, "chieuDayThuc":3.4,"chieuDaiDoanOngThayThe": 1.2, "phuongAn":"Cắt thay","queHanSuDung":"ER80S-B2","khoiLuongCanLam":1,"soMoiHanCanLam":2,"soMoiBPCanLam":0,"catLam":1,"hanMoi1Lam":1,"hanMoi2Lam":1,"soMoiBPLam":0,"soDoanOngLam":1,"ghiChu":"Đã hàn xong"},
     ];
     let currentDetailKhuVuc = '';
 
@@ -416,8 +20,13 @@
     // CHỨC NĂNG IMPORT/EXPORT
     // ************************************************************
 
-    /** Xử lý file Kế hoạch (Plan) */
     function handlePlanUpload(event) {
+        // Kiểm tra thư viện XLSX trước khi chạy
+        if (typeof XLSX === 'undefined') {
+            alert("Lỗi: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng kiểm tra lại thẻ <script> CDN.");
+            return;
+        }
+
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
@@ -428,6 +37,7 @@
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 
+                // Lấy dữ liệu từ hàng 3 (range: 2)
                 const newPlanData = XLSX.utils.sheet_to_json(worksheet, {
                     header: ["STT_Ignore", "khuVuc", "soDoanOngCan", "soMoiBPCan", "tongMoiHanCan"],
                     range: 2, 
@@ -445,7 +55,6 @@
                     ghiChu: ""
                 }));
 
-                // Cập nhật totalData: Nếu khu vực đã tồn tại, giữ nguyên "Đã làm". Nếu là khu vực mới, thêm vào.
                 let tempTotalData = totalData;
                 totalData = updatedPlanData.map(newPlan => {
                     const existingItem = tempTotalData.find(old => old.khuVuc === newPlan.khuVuc);
@@ -461,14 +70,13 @@
                     return newPlan;
                 });
                 
-                // Thêm các khu vực cũ (có dữ liệu 'đã làm') không có trong file mới vào lại
                 const existingKhuVucNames = updatedPlanData.map(item => item.khuVuc);
                 totalData.push(...tempTotalData.filter(old => 
                     !existingKhuVucNames.includes(old.khuVuc) && (old.soDoanOngLam > 0 || old.tongMoiHanLam > 0)
                 ));
 
 
-                updateTotalDataFromDetail(); // Đồng bộ lại từ chi tiết (nếu có)
+                updateTotalDataFromDetail(); 
                 showTotalView();
                 alert(`Đã tải thành công và cập nhật ${totalData.length} khu vực KẾ HOẠCH!`);
             } catch (error) {
@@ -480,8 +88,12 @@
         reader.readAsArrayBuffer(file);
     }
 
-    /** Xử lý file Chi tiết (Detail) */
     function handleDetailUpload(event) {
+        if (typeof XLSX === 'undefined') {
+            alert("Lỗi: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng kiểm tra lại thẻ <script> CDN.");
+            return;
+        }
+
         const file = event.target.files[0];
         if (!file) return;
 
@@ -506,28 +118,28 @@
                     defval: "" 
                 });
                 
-                const dataRows = aoa.slice(3); // Bỏ 3 hàng header đầu tiên
+                const dataRows = aoa.slice(3); 
                 
                 const khuVucHienTai = currentDetailKhuVuc;
                 let importedData = [];
 
-                // VỊ TRÍ CỘT ĐÃ ĐƯỢC ĐIỀU CHỈNH 
-                const COL_HANGMUC = 3;           // Cột D
-                const COL_DUONGKINH = 4;           // Cột E (Đường kính danh định)
-                const COL_CHIEUDAY_DANHDINH = 5;   // Cột F (Chiều dày danh định)
-                const COL_CHIEUDAY_THUC = 6;       // Cột G (Chiều dày thực)
-                const COL_CHIEUDAI_ONG = 7;        // Cột H (Chiều dài đoạn ống thay thế)
-                const COL_QUEHAN = 8;              // Cột I (Que hàn sử dụng)
-                const COL_PHUONGAN = 9;            // Cột J (Phương án)
-                const COL_KL_CANLAM = 10;          // Cột K (Đoạn ống cần làm)
-                const COL_MOIHAN_CANLAM = 11;      // Cột L (Tổng số mối hàn cần làm)
-                const COL_MOIBP_CANLAM = 12;       // Cột M (Số mối biện pháp cần làm)
-                const COL_CAT_LAM = 13;            // Cột N (Đã Cắt)
-                const COL_HAN1_LAM = 14;           // Cột O (Đã Hàn mối 1)
-                const COL_HAN2_LAM = 15;           // Cột P (Đã Hàn mối 2)
-                const COL_MOIBP_LAM = 16;          // Cột Q (Số mối biện pháp đã làm)
-                const COL_DOANONG_LAM = 17;        // Cột R (Số đoạn ống đã làm)
-                const COL_GHICHU = 18;             // Cột S
+                // Cột Index (0-based) dựa trên cấu trúc file mẫu
+                const COL_HANGMUC = 3; 
+                const COL_DUONGKINH = 4;
+                const COL_CHIEUDAY_DANHDINH = 5;
+                const COL_CHIEUDAY_THUC = 6;
+                const COL_CHIEUDAI_ONG = 7;
+                const COL_QUEHAN = 8;
+                const COL_PHUONGAN = 9;
+                const COL_KL_CANLAM = 10;
+                const COL_MOIHAN_CANLAM = 11;
+                const COL_MOIBP_CANLAM = 12;
+                const COL_CAT_LAM = 13;
+                const COL_HAN1_LAM = 14;
+                const COL_HAN2_LAM = 15;
+                const COL_MOIBP_LAM = 16;
+                const COL_DOANONG_LAM = 17;
+                const COL_GHICHU = 18;
                 
                 const getFloat = (row, index) => {
                     const val = row[index];
@@ -587,7 +199,7 @@
                 alert(`Đã tải thành công và GHI ĐÈ ${importedData.length} mục dữ liệu CHI TIẾT cho khu vực ${khuVucHienTai}!`);
 
             } catch (error) {
-                alert("Lỗi khi đọc file Chi tiết. Vui lòng kiểm tra định dạng, HÀNG HEADER chi tiết bắt đầu từ HÀNG SỐ 4 (index 3), và thứ tự cột: " + error.message);
+                alert("Lỗi khi đọc file Chi tiết. Vui lòng kiểm tra định dạng và thứ tự cột: " + error.message);
             } finally {
                 document.getElementById('detail-file-input').value = '';
             }
@@ -595,27 +207,26 @@
         reader.readAsArrayBuffer(file);
     }
 
-    /** Tải về file Chi tiết */
     function downloadDataAsExcel() {
+        if (typeof XLSX === 'undefined') {
+            alert("Lỗi: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng kiểm tra lại thẻ <script> CDN.");
+            return;
+        }
+        
         if (detailData.length === 0) {
             alert("Không có dữ liệu chi tiết để tải về.");
             return;
         }
 
         const headers = [
-            "Khu vực", "Hạng mục", 
-            "Đường kính", "Chiều dày Danh Định", "Chiều dày Thực", "Chiều dài đoạn ống thay thế", 
-            "Que hàn sử dụng", "Phương án", 
-            "KL Cần làm (Đoạn ống)", "Tổng mối hàn CẦN", "Mối BP CẦN", 
-            "Đã làm: Cắt", "Đã làm: Hàn mối 1", "Đã làm: Hàn mối 2", "Đã làm: Mối BP", 
-            "Đã làm: Đoạn ống", "Ghi chú"
+            "Khu vực", "Hạng mục", "Đường kính", "Chiều dày Danh Định", "Chiều dày Thực", "Chiều dài đoạn ống thay thế", 
+            "Que hàn sử dụng", "Phương án", "KL Cần làm (Đoạn ống)", "Tổng mối hàn CẦN", "Mối BP CẦN", 
+            "Đã làm: Cắt", "Đã làm: Hàn mối 1", "Đã làm: Hàn mối 2", "Đã làm: Mối BP", "Đã làm: Đoạn ống", "Ghi chú"
         ];
         
         const dataForExport = detailData.map(item => [
-            item.khuVuc, item.hangMuc, 
-            item.duongKinh, item.chieuDayDanhDinh, item.chieuDayThuc, item.chieuDaiDoanOngThayThe, 
-            item.queHanSuDung, item.phuongAn, 
-            item.khoiLuongCanLam, item.soMoiHanCanLam, item.soMoiBPCanLam, 
+            item.khuVuc, item.hangMuc, item.duongKinh, item.chieuDayDanhDinh, item.chieuDayThuc, item.chieuDaiDoanOngThayThe, 
+            item.queHanSuDung, item.phuongAn, item.khoiLuongCanLam, item.soMoiHanCanLam, item.soMoiBPCanLam, 
             item.catLam, item.hanMoi1Lam, item.hanMoi2Lam, item.soMoiBPLam, item.soDoanOngLam, item.ghiChu
         ]);
 
@@ -630,76 +241,56 @@
     // CÁC HÀM XỬ LÝ DỮ LIỆU & GIAO DIỆN
     // ************************************************************
     
-    /** Cập nhật dữ liệu tổng hợp từ dữ liệu chi tiết (LOGIC ĐÃ SỬA) */
     function updateTotalDataFromDetail() {
         const planMapFromDetail = {};
         const summaryMapFromDetail = {};
 
-        // 1. Tính toán lại kế hoạch và thực hiện từ dữ liệu chi tiết
         detailData.forEach(item => {
             const khuVuc = item.khuVuc.trim();
-            
             if (!planMapFromDetail[khuVuc]) {
                 planMapFromDetail[khuVuc] = { soDoanOngCan: 0, soMoiBPCan: 0, tongMoiHanCan: 0 };
                 summaryMapFromDetail[khuVuc] = { soDoanOngLam: 0, soMoiBPLam: 0, tongMoiHanLam: 0 };
             }
             
-            // Kế hoạch (Can) - Lấy từ chi tiết
             planMapFromDetail[khuVuc].soDoanOngCan += parseInt(item.khoiLuongCanLam || 0);
             planMapFromDetail[khuVuc].soMoiBPCan += parseInt(item.soMoiBPCanLam || 0); 
             planMapFromDetail[khuVuc].tongMoiHanCan += parseInt(item.soMoiHanCanLam || 0);
 
-            // Đã làm (Lam) - Lấy từ chi tiết
             summaryMapFromDetail[khuVuc].soDoanOngLam += parseInt(item.soDoanOngLam || 0);
             summaryMapFromDetail[khuVuc].soMoiBPLam += parseInt(item.soMoiBPLam || 0);
-            
-            // Tổng mối hàn đã làm = Cắt + Hàn mối 1 + Hàn mối 2 
             summaryMapFromDetail[khuVuc].tongMoiHanLam += parseInt(item.catLam || 0) + parseInt(item.hanMoi1Lam || 0) + parseInt(item.hanMoi2Lam || 0); 
         });
 
         const newTotalData = [];
-        
-        // 2. Gom tất cả khu vực từ cả 2 nguồn: totalData cũ và detailData mới
         const allKhuVuc = new Set([...totalData.map(item => item.khuVuc), ...Object.keys(planMapFromDetail)]);
 
-        // 3. Xây dựng lại totalData với logic ưu tiên Kế hoạch từ Chi tiết
         allKhuVuc.forEach(khuVuc => {
             const existingItem = totalData.find(old => old.khuVuc === khuVuc);
             const summary = summaryMapFromDetail[khuVuc] || { soDoanOngLam: 0, soMoiBPLam: 0, tongMoiHanLam: 0 };
             const planFromDetail = planMapFromDetail[khuVuc];
             
-            let updatedItem = { 
-                khuVuc: khuVuc, 
-                // Giữ lại ghi chú từ totalData cũ nếu có
-                ghiChu: (existingItem ? existingItem.ghiChu : '') || '' 
-            };
+            let updatedItem = { khuVuc: khuVuc, ghiChu: (existingItem ? existingItem.ghiChu : '') || '' };
             
-            // LOGIC ĐÃ SỬA ĐỔI: ƯU TIÊN KẾ HOẠCH TỪ CHI TIẾT
             const hasDetailPlan = planFromDetail && (planFromDetail.soDoanOngCan > 0 || planFromDetail.tongMoiHanCan > 0);
             
             if (hasDetailPlan) {
-                // Ưu tiên: Sử dụng Kế hoạch TỪ DỮ LIỆU CHI TIẾT
                 updatedItem.soDoanOngCan = planFromDetail.soDoanOngCan;
                 updatedItem.soMoiBPCan = planFromDetail.soMoiBPCan;
                 updatedItem.tongMoiHanCan = planFromDetail.tongMoiHanCan;
             } else if (existingItem) {
-                // Dự phòng: Sử dụng Kế hoạch TỪ FILE TỔNG nếu Kế hoạch chi tiết bằng 0/không tồn tại
                 updatedItem.soDoanOngCan = existingItem.soDoanOngCan;
                 updatedItem.soMoiBPCan = existingItem.soMoiBPCan;
                 updatedItem.tongMoiHanCan = existingItem.tongMoiHanCan;
             } else {
-                // Trường hợp không có kế hoạch nào 
                 updatedItem.soDoanOngCan = 0;
                 updatedItem.soMoiBPCan = 0;
                 updatedItem.tongMoiHanCan = 0;
             }
 
-            // Thực hiện (Lam): LUÔN LUÔN LẤY TỪ DỮ LIỆU CHI TIẾT
             updatedItem.soDoanOngLam = summary.soDoanOngLam;
             updatedItem.soMoiBPLam = summary.soMoiBPLam;
             updatedItem.tongMoiHanLam = summary.tongMoiHanLam;
 
-            // Bỏ qua nếu Kế hoạch và Thực hiện đều bằng 0
             if (updatedItem.soDoanOngCan === 0 && updatedItem.tongMoiHanCan === 0 && updatedItem.soDoanOngLam === 0 && updatedItem.tongMoiHanLam === 0) {
                 return;
             }
@@ -712,31 +303,26 @@
     }
 
 
-    /** Hiển thị bảng tổng hợp */
     function renderTotalTable() {
         const tbody = document.getElementById('total-data-body');
+        const totalDataTable = document.getElementById('total-data-table');
+        if (!tbody || !totalDataTable) return; // Bảo vệ khỏi lỗi DOM
+
         tbody.innerHTML = '';
-        let totalSoDoanOngCan = 0;
-        let totalSoMoiBPCan = 0;
-        let totalTongMoiHanCan = 0;
-        let totalSoDoanOngLam = 0;
-        let totalSoMoiBPLam = 0;
-        let totalTongMoiHanLam = 0;
+        let totals = { canOng: 0, canBP: 0, canHan: 0, lamOng: 0, lamBP: 0, lamHan: 0 };
 
         totalData.forEach(item => {
-            // Tính toán cột còn lại
             const soDoanOngConLai = item.soDoanOngCan - item.soDoanOngLam;
             const soMoiBPConLai = item.soMoiBPCan - item.soMoiBPLam;
             const tongMoiHanConLai = item.tongMoiHanCan - item.tongMoiHanLam;
 
-            // Tính toán cột % Hoàn thành
             const percentDoanOng = item.soDoanOngCan > 0 ? (item.soDoanOngLam / item.soDoanOngCan * 100).toFixed(1) : 0;
             const percentMoiHan = item.tongMoiHanCan > 0 ? (item.tongMoiHanLam / item.tongMoiHanCan * 100).toFixed(1) : 0;
 
             const row = tbody.insertRow();
             row.onclick = () => showDetailView(item.khuVuc);
             
-            row.insertCell().textContent = item.khuVuc; // Khu vực
+            row.insertCell().textContent = item.khuVuc; 
             row.insertCell().textContent = item.soDoanOngCan;
             row.insertCell().textContent = item.soMoiBPCan;
             row.insertCell().textContent = item.tongMoiHanCan;
@@ -758,48 +344,50 @@
             row.insertCell().textContent = item.ghiChu;
 
             // Tính tổng cộng
-            totalSoDoanOngCan += item.soDoanOngCan;
-            totalSoMoiBPCan += item.soMoiBPCan;
-            totalTongMoiHanCan += item.tongMoiHanCan;
-            totalSoDoanOngLam += item.soDoanOngLam;
-            totalSoMoiBPLam += item.soMoiBPLam;
-            totalTongMoiHanLam += item.tongMoiHanLam;
+            totals.canOng += item.soDoanOngCan;
+            totals.canBP += item.soMoiBPCan;
+            totals.canHan += item.tongMoiHanCan;
+            totals.lamOng += item.soDoanOngLam;
+            totals.lamBP += item.soMoiBPLam;
+            totals.lamHan += item.tongMoiHanLam;
         });
 
-        // Thêm hàng Tổng cộng
+        // Xóa tfoot cũ
+        let existingTfoot = totalDataTable.querySelector('tfoot');
+        if (existingTfoot) existingTfoot.remove();
+
+        // Thêm tfoot mới
         const tfoot = document.createElement('tfoot');
         const totalRow = tfoot.insertRow();
         totalRow.style.fontWeight = 'bold';
         totalRow.style.backgroundColor = '#007bff';
         totalRow.style.color = 'white';
         
-        const totalPercentDoanOng = totalSoDoanOngCan > 0 ? (totalSoDoanOngLam / totalSoDoanOngCan * 100).toFixed(1) : 0;
-        const totalPercentMoiHan = totalTongMoiHanCan > 0 ? (totalTongMoiHanLam / totalTongMoiHanCan * 100).toFixed(1) : 0;
+        const totalPercentDoanOng = totals.canOng > 0 ? (totals.lamOng / totals.canOng * 100).toFixed(1) : 0;
+        const totalPercentMoiHan = totals.canHan > 0 ? (totals.lamHan / totals.canHan * 100).toFixed(1) : 0;
 
         totalRow.insertCell().textContent = "TỔNG CỘNG";
-        totalRow.insertCell().textContent = totalSoDoanOngCan;
-        totalRow.insertCell().textContent = totalSoMoiBPCan;
-        totalRow.insertCell().textContent = totalTongMoiHanCan;
-        totalRow.insertCell().textContent = totalSoDoanOngLam;
-        totalRow.insertCell().textContent = totalSoMoiBPLam;
-        totalRow.insertCell().textContent = totalTongMoiHanLam;
-        totalRow.insertCell().textContent = totalSoDoanOngCan - totalSoDoanOngLam;
-        totalRow.insertCell().textContent = totalSoMoiBPCan - totalSoMoiBPLam;
-        totalRow.insertCell().textContent = totalTongMoiHanCan - totalTongMoiHanLam;
+        totalRow.insertCell().textContent = totals.canOng;
+        totalRow.insertCell().textContent = totals.canBP;
+        totalRow.insertCell().textContent = totals.canHan;
+        totalRow.insertCell().textContent = totals.lamOng;
+        totalRow.insertCell().textContent = totals.lamBP;
+        totalRow.insertCell().textContent = totals.lamHan;
+        totalRow.insertCell().textContent = totals.canOng - totals.lamOng;
+        totalRow.insertCell().textContent = totals.canBP - totals.lamBP;
+        totalRow.insertCell().textContent = totals.canHan - totals.lamHan;
         totalRow.insertCell().textContent = totalPercentDoanOng + '%';
         totalRow.insertCell().textContent = totalPercentMoiHan + '%';
         totalRow.insertCell().textContent = "";
-
-        const existingTfoot = document.querySelector('#total-data-table tfoot');
-        if (existingTfoot) existingTfoot.remove();
-        document.getElementById('total-data-table').appendChild(tfoot);
+        
+        totalDataTable.appendChild(tfoot);
 
         // Hiển thị nút quản lý file kế hoạch
-        document.getElementById('hidden-file-management').style.display = 'flex';
+        const fileManagement = document.getElementById('hidden-file-management');
+        if (fileManagement) fileManagement.style.display = 'flex';
     }
 
 
-    /** Chuyển sang chế độ xem chi tiết */
     function showDetailView(khuVuc) {
         currentDetailKhuVuc = khuVuc;
         document.getElementById('view-total').style.display = 'none';
@@ -813,7 +401,6 @@
         resetForm();
     }
 
-    /** Chuyển về chế độ xem tổng hợp */
     function showTotalView() {
         document.getElementById('view-total').style.display = 'block';
         document.getElementById('hidden-file-management').style.display = 'flex';
@@ -821,25 +408,24 @@
         renderTotalTable();
     }
 
-    /** Lọc và hiển thị bảng chi tiết */
     function applyDetailFilters() {
         const tbody = document.getElementById('data-body');
         const filterText = document.getElementById('filterHangMuc').value.toLowerCase().trim();
+        const tfoot = document.getElementById('data-tfoot');
+        if (!tbody || !tfoot) return;
+
         tbody.innerHTML = '';
         let sttCounter = 1;
         let filteredData = detailData.filter(item => item.khuVuc === currentDetailKhuVuc && item.hangMuc.toLowerCase().includes(filterText));
 
-        // Khởi tạo các biến tổng cộng cho tfoot
-        let sumKLCan = 0, sumMoiHanCan = 0, sumMoiBPCan = 0;
-        let sumCatLam = 0, sumHan1Lam = 0, sumHan2Lam = 0, sumMoiBPLam = 0, sumDoanOngLam = 0;
+        let totals = { canOng: 0, canHan: 0, canBP: 0, lamCat: 0, lamHan1: 0, lamHan2: 0, lamBP: 0, lamOng: 0 };
 
         filteredData.forEach((item, index) => {
             const row = tbody.insertRow();
-            // Lấy index trong mảng detailData, không phải index trong filteredData
+            // Lấy index trong mảng detailData
             const detailDataIndex = detailData.findIndex(d => d.khuVuc === item.khuVuc && d.hangMuc === item.hangMuc);
             row.onclick = () => loadRowToForm(item, detailDataIndex);
             
-            // Cột STT, Hạng mục, Thông số vật tư, Phương án
             row.insertCell().textContent = sttCounter++; 
             row.insertCell().textContent = item.hangMuc; 
             row.insertCell().textContent = item.duongKinh || '';
@@ -849,64 +435,57 @@
             row.insertCell().textContent = item.phuongAn || '';
             row.insertCell().textContent = item.queHanSuDung || '';
             
-            // Cột Kế hoạch (CẦN LÀM)
             row.insertCell().textContent = item.khoiLuongCanLam || '';
             row.insertCell().textContent = item.soMoiHanCanLam || '';
             row.insertCell().textContent = item.soMoiBPCanLam || '';
             
-            // Cột Thực hiện (ĐÃ LÀM)
             row.insertCell().textContent = item.catLam || 0;
             row.insertCell().textContent = item.hanMoi1Lam || 0;
             row.insertCell().textContent = item.hanMoi2Lam || 0;
             row.insertCell().textContent = item.soMoiBPLam || 0;
             row.insertCell().textContent = item.soDoanOngLam || 0;
             
-            // Cột Ghi chú
             row.insertCell().textContent = item.ghiChu || '';
 
             // Tính tổng
-            sumKLCan += parseInt(item.khoiLuongCanLam || 0);
-            sumMoiHanCan += parseInt(item.soMoiHanCanLam || 0);
-            sumMoiBPCan += parseInt(item.soMoiBPCanLam || 0);
-            sumCatLam += parseInt(item.catLam || 0);
-            sumHan1Lam += parseInt(item.hanMoi1Lam || 0);
-            sumHan2Lam += parseInt(item.hanMoi2Lam || 0);
-            sumMoiBPLam += parseInt(item.soMoiBPLam || 0);
-            sumDoanOngLam += parseInt(item.soDoanOngLam || 0);
+            totals.canOng += parseInt(item.khoiLuongCanLam || 0);
+            totals.canHan += parseInt(item.soMoiHanCanLam || 0);
+            totals.canBP += parseInt(item.soMoiBPCanLam || 0);
+            totals.lamCat += parseInt(item.catLam || 0);
+            totals.lamHan1 += parseInt(item.hanMoi1Lam || 0);
+            totals.lamHan2 += parseInt(item.hanMoi2Lam || 0);
+            totals.lamBP += parseInt(item.soMoiBPLam || 0);
+            totals.lamOng += parseInt(item.soDoanOngLam || 0);
         });
 
         // Cập nhật tfoot
-        const tfoot = document.getElementById('data-tfoot');
         tfoot.innerHTML = '';
         const footerRow = tfoot.insertRow();
         footerRow.style.fontWeight = 'bold';
         footerRow.style.backgroundColor = '#f1f1f1';
         
-        footerRow.insertCell().textContent = ''; // STT
+        footerRow.insertCell().textContent = ''; 
         footerRow.insertCell().textContent = 'TỔNG CỘNG';
-        footerRow.insertCell().colSpan = 6; // Gộp cột thông số
+        footerRow.insertCell().colSpan = 6; 
         
-        footerRow.insertCell().textContent = sumKLCan;
-        footerRow.insertCell().textContent = sumMoiHanCan;
-        footerRow.insertCell().textContent = sumMoiBPCan;
+        footerRow.insertCell().textContent = totals.canOng;
+        footerRow.insertCell().textContent = totals.canHan;
+        footerRow.insertCell().textContent = totals.canBP;
         
-        footerRow.insertCell().textContent = sumCatLam;
-        footerRow.insertCell().textContent = sumHan1Lam;
-        footerRow.insertCell().textContent = sumHan2Lam;
-        footerRow.insertCell().textContent = sumMoiBPLam;
-        footerRow.insertCell().textContent = sumDoanOngLam;
+        footerRow.insertCell().textContent = totals.lamCat;
+        footerRow.insertCell().textContent = totals.lamHan1;
+        footerRow.insertCell().textContent = totals.lamHan2;
+        footerRow.insertCell().textContent = totals.lamBP;
+        footerRow.insertCell().textContent = totals.lamOng;
 
-        footerRow.insertCell().textContent = ''; // Ghi chú
+        footerRow.insertCell().textContent = ''; 
 
-        // Cập nhật STT tiếp theo
         document.getElementById('stt').value = filteredData.length + 1;
     }
 
-    /** Thêm hàng mới hoặc cập nhật tiến độ */
     document.getElementById('add-row-btn').addEventListener('click', () => {
         const khuVuc = document.getElementById('khuVuc').value;
         const hangMuc = document.getElementById('hangMuc').value.trim();
-        const detailDataIndex = document.getElementById('stt').dataset.index;
         
         if (!hangMuc) {
             alert("Hạng mục không được để trống!");
@@ -939,11 +518,9 @@
         const existingIndex = detailData.findIndex(item => item.khuVuc === khuVuc && item.hangMuc === hangMuc);
 
         if (existingIndex !== -1) {
-            // Cập nhật
             detailData[existingIndex] = newData;
             alert(`Đã CẬP NHẬT tiến độ cho hạng mục: ${hangMuc}`);
         } else {
-            // Thêm mới
             detailData.push(newData);
             alert(`Đã THÊM MỚI hạng mục: ${hangMuc}`);
         }
@@ -953,11 +530,8 @@
         resetForm();
     });
 
-    /** Load dữ liệu từ hàng vào form để chỉnh sửa */
     function loadRowToForm(item, index) {
         document.getElementById('stt').value = document.getElementById('data-body').rows.findIndex(row => row.onclick.toString().includes(item.hangMuc)) + 1;
-        document.getElementById('stt').dataset.index = index; // Lưu index thực của detailData
-        
         document.getElementById('khuVuc').value = item.khuVuc;
         document.getElementById('hangMuc').value = item.hangMuc;
         document.getElementById('duongKinh').value = item.duongKinh;
@@ -980,15 +554,10 @@
         document.getElementById('ghiChu').value = item.ghiChu;
     }
 
-    /** Reset form nhập liệu */
     function resetForm() {
-        // Giữ lại Khu vực và STT
-        const currentKhuVuc = document.getElementById('khuVuc').value;
-        const nextStt = document.getElementById('data-body').rows.length + 1;
+        const nextStt = document.getElementById('data-body') ? document.getElementById('data-body').rows.length + 1 : 1;
 
-        // Xóa/Đặt lại các trường còn lại về giá trị mặc định/ban đầu
         document.getElementById('stt').value = nextStt;
-        document.getElementById('stt').dataset.index = -1; // Đánh dấu là thêm mới
         document.getElementById('hangMuc').value = '';
         document.getElementById('duongKinh').value = '50.80';
         document.getElementById('chieuDayDanhDinh').value = '4.57';
@@ -1009,13 +578,18 @@
         document.getElementById('hangMuc').focus();
     }
 
-    // Khởi tạo bảng tổng hợp khi tải trang
-    window.onload = function() {
+    // Khởi tạo bảng tổng hợp khi DOM đã tải xong
+    document.addEventListener('DOMContentLoaded', function() {
+        // Gán các hàm xử lý cho input file sau khi DOM sẵn sàng
+        const planInput = document.getElementById('plan-file-input');
+        if (planInput) planInput.onchange = handlePlanUpload;
+        
+        const detailInput = document.getElementById('detail-file-input');
+        if (detailInput) detailInput.onchange = handleDetailUpload;
+
+        // Bắt đầu khởi tạo dữ liệu và giao diện
         updateTotalDataFromDetail(); 
         showTotalView();
-    };
+    });
 
 </script>
-
-</body>
-</html>
