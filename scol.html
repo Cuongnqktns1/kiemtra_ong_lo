@@ -252,11 +252,11 @@
     let currentDetailKhuVuc = '';
 
     // ************************************************************
-    // HÀM KIỂM TRA LỖI NỀN TẢNG (GIÚP KHẮC PHỤC LỖI KHÔNG HIỂN THỊ)
+    // HÀM KIỂM TRA LỖI NỀN TẢNG
     // ************************************************************
     function checkXLSXLibrary() {
         if (typeof XLSX === 'undefined') {
-            alert("LỖI KHÔNG HIỂN THỊ: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng thực hiện HƯỚNG DẪN QUAN TRỌNG ở đầu file HTML để tải file thư viện về máy.");
+            alert("LỖI KHÔNG TẢI ĐƯỢC THƯ VIỆN: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng thực hiện HƯỚNG DẪN QUAN TRỌNG ở đầu file HTML để tải file thư viện về máy.");
             return false;
         }
         return true;
@@ -290,7 +290,6 @@
                     soDoanOngLam: 0, soMoiBPLam: 0, tongMoiHanLam: 0, ghiChu: ""
                 }));
 
-                // Logic gộp dữ liệu cũ và mới
                 let tempTotalData = totalData;
                 totalData = newPlanData.map(newPlan => {
                     const existingItem = tempTotalData.find(old => old.khuVuc === newPlan.khuVuc);
@@ -614,44 +613,6 @@
         document.getElementById('stt').value = filteredData.length + 1;
     }
 
-    document.getElementById('add-row-btn').addEventListener('click', () => {
-        const khuVuc = document.getElementById('khuVuc').value;
-        const hangMuc = document.getElementById('hangMuc').value.trim();
-        
-        if (!hangMuc) { alert("Hạng mục không được để trống!"); return; }
-
-        const newData = {
-            khuVuc: khuVuc, hangMuc: hangMuc, duongKinh: parseFloat(document.getElementById('duongKinh').value) || 0,
-            chieuDayDanhDinh: parseFloat(document.getElementById('chieuDayDanhDinh').value) || 0,
-            chieuDayThuc: parseFloat(document.getElementById('chieuDayThuc').value) || 0,
-            chieuDaiDoanOngThayThe: parseFloat(document.getElementById('chieuDaiDoanOngThayThe').value) || 0,
-            phuongAn: document.getElementById('phuongAn').value, queHanSuDung: document.getElementById('queHanSuDung').value,
-            khoiLuongCanLam: parseInt(document.getElementById('khoiLuongCanLam').value) || 0,
-            soMoiHanCanLam: parseInt(document.getElementById('soMoiHanCanLam').value) || 0,
-            soMoiBPCanLam: parseInt(document.getElementById('soMoiBPCanLam').value) || 0,
-            catLam: parseInt(document.getElementById('catLam').value) || 0,
-            hanMoi1Lam: parseInt(document.getElementById('hanMoi1Lam').value) || 0,
-            hanMoi2Lam: parseInt(document.getElementById('hanMoi2Lam').value) || 0,
-            soMoiBPLam: parseInt(document.getElementById('soMoiBPLam').value) || 0,
-            soDoanOngLam: parseInt(document.getElementById('soDoanOngLam').value) || 0,
-            ghiChu: document.getElementById('ghiChu').value.trim()
-        };
-
-        const existingIndex = detailData.findIndex(item => item.khuVuc === khuVuc && item.hangMuc === hangMuc);
-
-        if (existingIndex !== -1) {
-            detailData[existingIndex] = newData;
-            alert(`Đã CẬP NHẬT tiến độ cho hạng mục: ${hangMuc}`);
-        } else {
-            detailData.push(newData);
-            alert(`Đã THÊM MỚI hạng mục: ${hangMuc}`);
-        }
-
-        updateTotalDataFromDetail();
-        applyDetailFilters();
-        resetForm();
-    });
-
     function loadRowToForm(item) {
         document.getElementById('stt').value = document.getElementById('data-body').rows.findIndex(row => row.onclick.toString().includes(item.hangMuc)) + 1;
         document.getElementById('khuVuc').value = item.khuVuc; document.getElementById('hangMuc').value = item.hangMuc;
@@ -686,12 +647,53 @@
 
     // Khởi tạo bảng tổng hợp khi DOM đã tải xong
     document.addEventListener('DOMContentLoaded', function() {
+        // Gán các hàm xử lý cho input file sau khi DOM sẵn sàng
         const planInput = document.getElementById('plan-file-input');
         if (planInput) planInput.onchange = handlePlanUpload;
         
         const detailInput = document.getElementById('detail-file-input');
         if (detailInput) detailInput.onchange = handleDetailUpload;
 
+        // **ĐÃ SỬA LỖI (TypeError) bằng cách chuyển AddEventListener vào trong DOMContentLoaded**
+        document.getElementById('add-row-btn').addEventListener('click', () => {
+            const khuVuc = document.getElementById('khuVuc').value;
+            const hangMuc = document.getElementById('hangMuc').value.trim();
+            
+            if (!hangMuc) { alert("Hạng mục không được để trống!"); return; }
+
+            const newData = {
+                khuVuc: khuVuc, hangMuc: hangMuc, duongKinh: parseFloat(document.getElementById('duongKinh').value) || 0,
+                chieuDayDanhDinh: parseFloat(document.getElementById('chieuDayDanhDinh').value) || 0,
+                chieuDayThuc: parseFloat(document.getElementById('chieuDayThuc').value) || 0,
+                chieuDaiDoanOngThayThe: parseFloat(document.getElementById('chieuDaiDoanOngThayThe').value) || 0,
+                phuongAn: document.getElementById('phuongAn').value, queHanSuDung: document.getElementById('queHanSuDung').value,
+                khoiLuongCanLam: parseInt(document.getElementById('khoiLuongCanLam').value) || 0,
+                soMoiHanCanLam: parseInt(document.getElementById('soMoiHanCanLam').value) || 0,
+                soMoiBPCanLam: parseInt(document.getElementById('soMoiBPCanLam').value) || 0,
+                catLam: parseInt(document.getElementById('catLam').value) || 0,
+                hanMoi1Lam: parseInt(document.getElementById('hanMoi1Lam').value) || 0,
+                hanMoi2Lam: parseInt(document.getElementById('hanMoi2Lam').value) || 0,
+                soMoiBPLam: parseInt(document.getElementById('soMoiBPLam').value) || 0,
+                soDoanOngLam: parseInt(document.getElementById('soDoanOngLam').value) || 0,
+                ghiChu: document.getElementById('ghiChu').value.trim()
+            };
+
+            const existingIndex = detailData.findIndex(item => item.khuVuc === khuVuc && item.hangMuc === hangMuc);
+
+            if (existingIndex !== -1) {
+                detailData[existingIndex] = newData;
+                alert(`Đã CẬP NHẬT tiến độ cho hạng mục: ${hangMuc}`);
+            } else {
+                detailData.push(newData);
+                alert(`Đã THÊM MỚI hạng mục: ${hangMuc}`);
+            }
+
+            updateTotalDataFromDetail();
+            applyDetailFilters();
+            resetForm();
+        });
+
+        // Bắt đầu khởi tạo dữ liệu và giao diện
         updateTotalDataFromDetail(); 
         showTotalView();
     });
