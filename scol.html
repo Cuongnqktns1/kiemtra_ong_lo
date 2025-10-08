@@ -1,5 +1,240 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Tiến Độ Đại Tu Lò Hơi (Total & Detail)</title>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script> 
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f9; }
+        .container { max-width: 98%; margin: auto; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 8px; }
+        h1, h2 { color: #333; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 14px; }
+        th { background-color: #007bff; color: white; position: sticky; top: 0; z-index: 10; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        #total-data-body tr:hover, #data-body tr:hover { background-color: #e2e6ea; cursor: pointer; }
+        .plan-group { background-color: #dc3545; color: white; }
+        .lam-group { background-color: #28a745; color: white; }
+        .conlai-group { background-color: #ffc107; color: #333; }
+        .percent-group { background-color: #17a2b8; color: white; }
+        .total-row { font-weight: bold; background-color: #007bff; color: white; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .form-group { display: flex; flex-direction: column; min-width: 100px; }
+        .form-group.full-width { flex-grow: 1; }
+        .form-group label { font-weight: bold; margin-bottom: 5px; font-size: 12px; color: #555; }
+        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px; transition: background-color 0.3s; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        .import-export-section { display: flex; gap: 15px; margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #e9ecef; flex-wrap: wrap; }
+        .file-input-wrapper { display: flex; align-items: center; gap: 10px; }
+        #view-detail { display: none; } /* Mặc định ẩn view chi tiết */
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Quản Lý Tiến Độ Đại Tu Lò Hơi</h1>
+    
+    <div id="hidden-file-management" class="import-export-section">
+        <div class="file-input-wrapper">
+            <label for="plan-file-input" style="font-weight: bold;">Import Kế hoạch (Tổng hợp):</label>
+            <input type="file" id="plan-file-input" accept=".xlsx, .xls" style="display: none;">
+            <button onclick="document.getElementById('plan-file-input').click()" class="btn-primary">Chọn File Kế Hoạch (.xlsx)</button>
+        </div>
+        <div class="file-input-wrapper">
+            <button onclick="downloadDataAsExcel()" class="btn-secondary">Export Dữ liệu Chi tiết (.xlsx)</button>
+        </div>
+    </div>
+
+
+    <div id="view-total">
+        <h2>Tiến Độ Tổng Hợp Các Khu Vực</h2>
+        <p style="font-style: italic;">(Click vào dòng để xem hoặc cập nhật chi tiết)</p>
+        <div style="overflow-x: auto;">
+            <table id="total-data-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2">Khu Vực</th>
+                        <th colspan="3" class="plan-group">Kế Hoạch CẦN LÀM</th>
+                        <th colspan="3" class="lam-group">Khối Lượng ĐÃ LÀM</th>
+                        <th colspan="3" class="conlai-group">CÒN LẠI</th>
+                        <th colspan="2" class="percent-group">% Hoàn Thành</th>
+                        <th rowspan="2">Ghi Chú</th>
+                    </tr>
+                    <tr>
+                        <th class="plan-group">Đoạn Ống</th>
+                        <th class="plan-group">Mối BP</th>
+                        <th class="plan-group">Tổng Mối Hàn</th>
+                        <th class="lam-group">Đoạn Ống</th>
+                        <th class="lam-group">Mối BP</th>
+                        <th class="lam-group">Tổng Mối Hàn</th>
+                        <th class="conlai-group">Đoạn Ống</th>
+                        <th class="conlai-group">Mối BP</th>
+                        <th class="conlai-group">Tổng Mối Hàn</th>
+                        <th class="percent-group">% Đoạn Ống</th>
+                        <th class="percent-group">% Mối Hàn</th>
+                    </tr>
+                </thead>
+                <tbody id="total-data-body">
+                    </tbody>
+                <tfoot>
+                    </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div id="view-detail">
+        <h2 id="detail-header">CHI TIẾT TIẾN ĐỘ KHU VỰC:</h2>
+        
+        <button onclick="showTotalView()" class="btn-secondary" style="margin-bottom: 15px;">&larr; Quay lại Bảng Tổng Hợp</button>
+        
+        <div class="import-export-section" style="background-color: #e6f7ff; border-color: #b3e0ff;">
+            <div class="file-input-wrapper">
+                <label for="detail-file-input" style="font-weight: bold;">Import Chi tiết cho khu vực <span id="current-khuVuc-update" style="color:#007bff;"></span>:</label>
+                <input type="file" id="detail-file-input" accept=".xlsx, .xls" style="display: none;">
+                <button onclick="document.getElementById('detail-file-input').click()" class="btn-primary">Chọn File Chi Tiết (.xlsx)</button>
+            </div>
+            <div class="form-group">
+                <label for="filterHangMuc">Lọc Hạng Mục:</label>
+                <input type="text" id="filterHangMuc" onkeyup="applyDetailFilters()" placeholder="Nhập tên hạng mục...">
+            </div>
+        </div>
+
+        <h3>Cập Nhật Tiến Độ (Click vào hàng trong bảng để chỉnh sửa)</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="stt">STT</label>
+                <input type="number" id="stt" value="1" disabled style="background: #f8f9fa;">
+            </div>
+            <div class="form-group full-width">
+                <label for="hangMuc">Hạng Mục <span style="color:red;">*</span></label>
+                <input type="text" id="hangMuc" placeholder="Ví dụ: TQNTG T5/ Giàn 5-1">
+                <input type="hidden" id="khuVuc" value="">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="duongKinh">ĐK (mm)</label>
+                <input type="number" step="0.01" id="duongKinh" value="50.80">
+            </div>
+            <div class="form-group">
+                <label for="chieuDayDanhDinh">CD DĐ (mm)</label>
+                <input type="number" step="0.01" id="chieuDayDanhDinh" value="4.57">
+            </div>
+            <div class="form-group">
+                <label for="chieuDayThuc">CD Thực (mm)</label>
+                <input type="number" step="0.01" id="chieuDayThuc" value="3.41">
+            </div>
+            <div class="form-group">
+                <label for="chieuDaiDoanOngThayThe">Chiều Dài Thay (m)</label>
+                <input type="number" step="0.1" id="chieuDaiDoanOngThayThe" value="1.0">
+            </div>
+            <div class="form-group">
+                <label for="phuongAn">Phương án</label>
+                <select id="phuongAn">
+                    <option value="Cắt thay">Cắt thay</option>
+                    <option value="Hàn đắp">Hàn đắp</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="queHanSuDung">Que hàn</label>
+                <input type="text" id="queHanSuDung" value="ER80S-B2">
+            </div>
+        </div>
+        
+        <div class="form-row" style="border-top: 1px solid #ddd; padding-top: 10px;">
+            <div class="form-group">
+                <label for="khoiLuongCanLam" style="color: #dc3545;">KL Đoạn Ống CẦN</label>
+                <input type="number" id="khoiLuongCanLam" value="1" min="0">
+            </div>
+            <div class="form-group">
+                <label for="soMoiHanCanLam" style="color: #dc3545;">Tổng Mối Hàn CẦN</label>
+                <input type="number" id="soMoiHanCanLam" value="2" min="0">
+            </div>
+            <div class="form-group">
+                <label for="soMoiBPCanLam" style="color: #dc3545;">Mối BP CẦN</label>
+                <input type="number" id="soMoiBPCanLam" value="0" min="0">
+            </div>
+
+            <div class="form-group" style="border-left: 1px solid #ccc; padding-left: 10px;">
+                <label for="catLam" style="color: #28a745;">ĐÃ LÀM: Cắt</label>
+                <input type="number" id="catLam" value="0" min="0">
+            </div>
+            <div class="form-group">
+                <label for="hanMoi1Lam" style="color: #28a745;">ĐÃ LÀM: Hàn Mối 1</label>
+                <input type="number" id="hanMoi1Lam" value="0" min="0">
+            </div>
+            <div class="form-group">
+                <label for="hanMoi2Lam" style="color: #28a745;">ĐÃ LÀM: Hàn Mối 2</label>
+                <input type="number" id="hanMoi2Lam" value="0" min="0">
+            </div>
+            <div class="form-group">
+                <label for="soMoiBPLam" style="color: #28a745;">ĐÃ LÀM: Mối BP</label>
+                <input type="number" id="soMoiBPLam" value="0" min="0">
+            </div>
+            <div class="form-group">
+                <label for="soDoanOngLam" style="color: #28a745;">ĐÃ LÀM: Đoạn Ống</label>
+                <input type="number" id="soDoanOngLam" value="0" min="0">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group full-width">
+                <label for="ghiChu">Ghi Chú</label>
+                <input type="text" id="ghiChu" placeholder="Nhập ghi chú">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <button id="add-row-btn" class="btn-primary">Lưu (Thêm mới/Cập nhật)</button>
+            <button onclick="resetForm()" class="btn-secondary">Reset Form</button>
+        </div>
+
+
+        <h3>Bảng Dữ Liệu Chi Tiết <span style="font-size: 0.8em; color: #555;">(Click để Load vào Form)</span></h3>
+        <div style="overflow-x: auto;">
+            <table id="detail-data-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2">STT</th>
+                        <th rowspan="2" style="min-width: 250px;">Hạng Mục</th>
+                        <th colspan="4" class="header-group">Thông Số Vật Tư</th>
+                        <th colspan="2" class="header-group">Phương Án</th>
+                        <th colspan="3" class="plan-group">Kế Hoạch CẦN LÀM</th>
+                        <th colspan="5" class="lam-group">Khối Lượng ĐÃ LÀM</th>
+                        <th rowspan="2">Ghi Chú</th>
+                    </tr>
+                    <tr>
+                        <th class="header-group">ĐK (mm)</th>
+                        <th class="header-group">CD DĐ (mm)</th>
+                        <th class="header-group">CD Thực (mm)</th>
+                        <th class="header-group">CD Thay (m)</th>
+                        <th class="header-group">Phương án</th>
+                        <th class="header-group">Que hàn</th>
+                        <th class="plan-group">KL Đoạn Ống</th>
+                        <th class="plan-group">Tổng Mối Hàn</th>
+                        <th class="plan-group">Mối BP</th>
+                        <th class="lam-group">Cắt</th>
+                        <th class="lam-group">Hàn Mối 1</th>
+                        <th class="lam-group">Hàn Mối 2</th>
+                        <th class="lam-group">Mối BP</th>
+                        <th class="lam-group">Đoạn Ống</th>
+                    </tr>
+                </thead>
+                <tbody id="data-body">
+                    </tbody>
+                <tfoot id="data-tfoot">
+                    </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
 <script>
-    // DỮ LIỆU KHỞI TẠO TỔNG HỢP (totalData)
+    // DỮ LIỆU KHỞI TẠO TỔNG HỢP VÀ CHI TIẾT
     let totalData = [
         {"khuVuc": "Quá nhiệt trung gian", "soDoanOngCan": 167, "soMoiBPCan": 141, "tongMoiHanCan": 467, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
         {"khuVuc": "Quá nhiệt cấp 1", "soDoanOngCan": 97, "soMoiBPCan": 180, "tongMoiHanCan": 373, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
@@ -17,16 +252,23 @@
     let currentDetailKhuVuc = '';
 
     // ************************************************************
+    // HÀM KIỂM TRA LỖI NỀN TẢNG (GIÚP KHẮC PHỤC LỖI KHÔNG HIỂN THỊ)
+    // ************************************************************
+    function checkXLSXLibrary() {
+        if (typeof XLSX === 'undefined') {
+            alert("LỖI KHÔNG HIỂN THỊ: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng thực hiện HƯỚNG DẪN QUAN TRỌNG ở đầu file HTML để tải file thư viện về máy.");
+            return false;
+        }
+        return true;
+    }
+
+
+    // ************************************************************
     // CHỨC NĂNG IMPORT/EXPORT
     // ************************************************************
 
     function handlePlanUpload(event) {
-        // Kiểm tra thư viện XLSX trước khi chạy
-        if (typeof XLSX === 'undefined') {
-            alert("Lỗi: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng kiểm tra lại thẻ <script> CDN.");
-            return;
-        }
-
+        if (!checkXLSXLibrary()) return;
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
@@ -34,53 +276,41 @@
             try {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 
-                // Lấy dữ liệu từ hàng 3 (range: 2)
                 const newPlanData = XLSX.utils.sheet_to_json(worksheet, {
                     header: ["STT_Ignore", "khuVuc", "soDoanOngCan", "soMoiBPCan", "tongMoiHanCan"],
                     range: 2, 
                     raw: false
-                });
-
-                let updatedPlanData = newPlanData.filter(item => item.khuVuc).map(item => ({
+                }).filter(item => item.khuVuc).map(item => ({
                     khuVuc: item.khuVuc.trim(),
                     soDoanOngCan: parseInt(item.soDoanOngCan) || 0,
                     soMoiBPCan: parseInt(item.soMoiBPCan) || 0,
                     tongMoiHanCan: parseInt(item.tongMoiHanCan) || 0,
-                    soDoanOngLam: 0, 
-                    soMoiBPLam: 0,   
-                    tongMoiHanLam: 0, 
-                    ghiChu: ""
+                    soDoanOngLam: 0, soMoiBPLam: 0, tongMoiHanLam: 0, ghiChu: ""
                 }));
 
+                // Logic gộp dữ liệu cũ và mới
                 let tempTotalData = totalData;
-                totalData = updatedPlanData.map(newPlan => {
+                totalData = newPlanData.map(newPlan => {
                     const existingItem = tempTotalData.find(old => old.khuVuc === newPlan.khuVuc);
-                    if (existingItem) {
-                        return {
-                            ...newPlan,
-                            soDoanOngLam: existingItem.soDoanOngLam,
-                            soMoiBPLam: existingItem.soMoiBPLam,
-                            tongMoiHanLam: existingItem.tongMoiHanLam,
-                            ghiChu: existingItem.ghiChu 
-                        };
-                    }
-                    return newPlan;
+                    return existingItem ? {
+                        ...newPlan,
+                        soDoanOngLam: existingItem.soDoanOngLam, soMoiBPLam: existingItem.soMoiBPLam,
+                        tongMoiHanLam: existingItem.tongMoiHanLam, ghiChu: existingItem.ghiChu 
+                    } : newPlan;
                 });
                 
-                const existingKhuVucNames = updatedPlanData.map(item => item.khuVuc);
+                const existingKhuVucNames = newPlanData.map(item => item.khuVuc);
                 totalData.push(...tempTotalData.filter(old => 
                     !existingKhuVucNames.includes(old.khuVuc) && (old.soDoanOngLam > 0 || old.tongMoiHanLam > 0)
                 ));
-
 
                 updateTotalDataFromDetail(); 
                 showTotalView();
                 alert(`Đã tải thành công và cập nhật ${totalData.length} khu vực KẾ HOẠCH!`);
             } catch (error) {
-                alert("Lỗi khi đọc file Kế hoạch. Vui lòng kiểm tra định dạng và vị trí cột: " + error.message);
+                alert("Lỗi khi đọc file Kế hoạch. Vui lòng kiểm tra định dạng: " + error.message);
             } finally {
                 document.getElementById('plan-file-input').value = '';
             }
@@ -89,16 +319,10 @@
     }
 
     function handleDetailUpload(event) {
-        if (typeof XLSX === 'undefined') {
-            alert("Lỗi: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng kiểm tra lại thẻ <script> CDN.");
-            return;
-        }
-
+        if (!checkXLSXLibrary()) return;
         const file = event.target.files[0];
-        if (!file) return;
-
-        if (!currentDetailKhuVuc) {
-            alert("Vui lòng click vào một Khu vực ở bảng tổng hợp trước khi Import Chi tiết.");
+        if (!file || !currentDetailKhuVuc) {
+            if (!currentDetailKhuVuc) alert("Vui lòng click vào một Khu vực ở bảng tổng hợp trước khi Import Chi tiết.");
             document.getElementById('detail-file-input').value = '';
             return;
         }
@@ -106,95 +330,35 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                
-                const aoa = XLSX.utils.sheet_to_json(worksheet, {
-                    header: 1, 
-                    range: 0, 
-                    raw: false, 
-                    defval: "" 
-                });
-                
+                const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                const aoa = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, range: 0, raw: false, defval: "" });
                 const dataRows = aoa.slice(3); 
                 
                 const khuVucHienTai = currentDetailKhuVuc;
                 let importedData = [];
 
-                // Cột Index (0-based) dựa trên cấu trúc file mẫu
-                const COL_HANGMUC = 3; 
-                const COL_DUONGKINH = 4;
-                const COL_CHIEUDAY_DANHDINH = 5;
-                const COL_CHIEUDAY_THUC = 6;
-                const COL_CHIEUDAI_ONG = 7;
-                const COL_QUEHAN = 8;
-                const COL_PHUONGAN = 9;
-                const COL_KL_CANLAM = 10;
-                const COL_MOIHAN_CANLAM = 11;
-                const COL_MOIBP_CANLAM = 12;
-                const COL_CAT_LAM = 13;
-                const COL_HAN1_LAM = 14;
-                const COL_HAN2_LAM = 15;
-                const COL_MOIBP_LAM = 16;
-                const COL_DOANONG_LAM = 17;
-                const COL_GHICHU = 18;
-                
-                const getFloat = (row, index) => {
-                    const val = row[index];
-                    return typeof val === 'number' ? val : (parseFloat(String(val).replace(/,/g, '.')) || 0);
-                };
-                const getInt = (row, index) => {
-                    const val = row[index];
-                    return typeof val === 'number' ? val : (parseInt(String(val).replace(/,/g, '.')) || 0);
-                };
+                const getFloat = (row, index) => typeof row[index] === 'number' ? row[index] : (parseFloat(String(row[index] || '').replace(/,/g, '.')) || 0);
+                const getInt = (row, index) => typeof row[index] === 'number' ? row[index] : (parseInt(String(row[index] || '').replace(/,/g, '.')) || 0);
                 const getString = (row, index) => (row[index] || '').trim();
 
-
                 dataRows.forEach(row => {
-                    const hangMuc = getString(row, COL_HANGMUC);
-                    const klCanLam = getInt(row, COL_KL_CANLAM);
-                    const mhCanLam = getInt(row, COL_MOIHAN_CANLAM);
-
-                    if (!hangMuc || (klCanLam === 0 && mhCanLam === 0)) {
-                        return; 
-                    }
-
+                    const hangMuc = getString(row, 3);
+                    if (!hangMuc || (getInt(row, 10) === 0 && getInt(row, 11) === 0)) return; 
                     importedData.push({
-                        khuVuc: khuVucHienTai, 
-                        hangMuc: hangMuc,
-                        duongKinh: getFloat(row, COL_DUONGKINH),
-                        chieuDayDanhDinh: getFloat(row, COL_CHIEUDAY_DANHDINH),
-                        chieuDayThuc: getFloat(row, COL_CHIEUDAY_THUC),
-                        chieuDaiDoanOngThayThe: getFloat(row, COL_CHIEUDAI_ONG),
-                        phuongAn: getString(row, COL_PHUONGAN),
-                        queHanSuDung: getString(row, COL_QUEHAN),
-                        
-                        khoiLuongCanLam: klCanLam,
-                        soMoiHanCanLam: mhCanLam,
-                        soMoiBPCanLam: getInt(row, COL_MOIBP_CANLAM),
-                        
-                        catLam: getInt(row, COL_CAT_LAM),
-                        hanMoi1Lam: getInt(row, COL_HAN1_LAM),
-                        hanMoi2Lam: getInt(row, COL_HAN2_LAM),
-                        soMoiBPLam: getInt(row, COL_MOIBP_LAM),
-                        soDoanOngLam: getInt(row, COL_DOANONG_LAM),
-                        ghiChu: getString(row, COL_GHICHU)
+                        khuVuc: khuVucHienTai, hangMuc: hangMuc, duongKinh: getFloat(row, 4), chieuDayDanhDinh: getFloat(row, 5), 
+                        chieuDayThuc: getFloat(row, 6), chieuDaiDoanOngThayThe: getFloat(row, 7), phuongAn: getString(row, 9),
+                        queHanSuDung: getString(row, 8), khoiLuongCanLam: getInt(row, 10), soMoiHanCanLam: getInt(row, 11),
+                        soMoiBPCanLam: getInt(row, 12), catLam: getInt(row, 13), hanMoi1Lam: getInt(row, 14), 
+                        hanMoi2Lam: getInt(row, 15), soMoiBPLam: getInt(row, 16), soDoanOngLam: getInt(row, 17), 
+                        ghiChu: getString(row, 18)
                     });
                 });
 
-                // Xóa dữ liệu cũ của khu vực hiện tại và thêm dữ liệu mới
                 detailData = detailData.filter(item => item.khuVuc !== khuVucHienTai);
                 detailData.push(...importedData); 
 
                 updateTotalDataFromDetail(); 
-                
-                if(document.getElementById('view-detail').style.display === 'block') {
-                    applyDetailFilters();
-                } else {
-                    showTotalView();
-                }
+                if(document.getElementById('view-detail').style.display === 'block') applyDetailFilters(); else showTotalView();
                 
                 alert(`Đã tải thành công và GHI ĐÈ ${importedData.length} mục dữ liệu CHI TIẾT cho khu vực ${khuVucHienTai}!`);
 
@@ -208,32 +372,21 @@
     }
 
     function downloadDataAsExcel() {
-        if (typeof XLSX === 'undefined') {
-            alert("Lỗi: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng kiểm tra lại thẻ <script> CDN.");
+        if (!checkXLSXLibrary() || detailData.length === 0) {
+            if (detailData.length === 0) alert("Không có dữ liệu chi tiết để tải về.");
             return;
         }
         
-        if (detailData.length === 0) {
-            alert("Không có dữ liệu chi tiết để tải về.");
-            return;
-        }
-
-        const headers = [
-            "Khu vực", "Hạng mục", "Đường kính", "Chiều dày Danh Định", "Chiều dày Thực", "Chiều dài đoạn ống thay thế", 
+        const headers = ["Khu vực", "Hạng mục", "Đường kính", "Chiều dày Danh Định", "Chiều dày Thực", "Chiều dài đoạn ống thay thế", 
             "Que hàn sử dụng", "Phương án", "KL Cần làm (Đoạn ống)", "Tổng mối hàn CẦN", "Mối BP CẦN", 
-            "Đã làm: Cắt", "Đã làm: Hàn mối 1", "Đã làm: Hàn mối 2", "Đã làm: Mối BP", "Đã làm: Đoạn ống", "Ghi chú"
-        ];
+            "Đã làm: Cắt", "Đã làm: Hàn mối 1", "Đã làm: Hàn mối 2", "Đã làm: Mối BP", "Đã làm: Đoạn ống", "Ghi chú"];
         
-        const dataForExport = detailData.map(item => [
-            item.khuVuc, item.hangMuc, item.duongKinh, item.chieuDayDanhDinh, item.chieuDayThuc, item.chieuDaiDoanOngThayThe, 
-            item.queHanSuDung, item.phuongAn, item.khoiLuongCanLam, item.soMoiHanCanLam, item.soMoiBPCanLam, 
-            item.catLam, item.hanMoi1Lam, item.hanMoi2Lam, item.soMoiBPLam, item.soDoanOngLam, item.ghiChu
-        ]);
+        const dataForExport = detailData.map(item => [item.khuVuc, item.hangMuc, item.duongKinh, item.chieuDayDanhDinh, item.chieuDayThuc, 
+            item.chieuDaiDoanOngThayThe, item.queHanSuDung, item.phuongAn, item.khoiLuongCanLam, item.soMoiHanCanLam, 
+            item.soMoiBPCanLam, item.catLam, item.hanMoi1Lam, item.hanMoi2Lam, item.soMoiBPLam, item.soDoanOngLam, item.ghiChu]);
 
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...dataForExport]);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "DuLieuChiTiet");
-
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...dataForExport]), "DuLieuChiTiet");
         XLSX.writeFile(wb, "DuLieuChiTiet_DaiTuLo1_" + new Date().toISOString().slice(0, 10) + ".xlsx");
     }
 
@@ -282,18 +435,14 @@
                 updatedItem.soMoiBPCan = existingItem.soMoiBPCan;
                 updatedItem.tongMoiHanCan = existingItem.tongMoiHanCan;
             } else {
-                updatedItem.soDoanOngCan = 0;
-                updatedItem.soMoiBPCan = 0;
-                updatedItem.tongMoiHanCan = 0;
+                updatedItem.soDoanOngCan = 0; updatedItem.soMoiBPCan = 0; updatedItem.tongMoiHanCan = 0;
             }
 
             updatedItem.soDoanOngLam = summary.soDoanOngLam;
             updatedItem.soMoiBPLam = summary.soMoiBPLam;
             updatedItem.tongMoiHanLam = summary.tongMoiHanLam;
 
-            if (updatedItem.soDoanOngCan === 0 && updatedItem.tongMoiHanCan === 0 && updatedItem.soDoanOngLam === 0 && updatedItem.tongMoiHanLam === 0) {
-                return;
-            }
+            if (updatedItem.soDoanOngCan === 0 && updatedItem.tongMoiHanCan === 0 && updatedItem.soDoanOngLam === 0 && updatedItem.tongMoiHanLam === 0) return;
 
             newTotalData.push(updatedItem);
         });
@@ -306,7 +455,7 @@
     function renderTotalTable() {
         const tbody = document.getElementById('total-data-body');
         const totalDataTable = document.getElementById('total-data-table');
-        if (!tbody || !totalDataTable) return; // Bảo vệ khỏi lỗi DOM
+        if (!tbody || !totalDataTable) return; 
 
         tbody.innerHTML = '';
         let totals = { canOng: 0, canBP: 0, canHan: 0, lamOng: 0, lamBP: 0, lamHan: 0 };
@@ -343,25 +492,16 @@
             
             row.insertCell().textContent = item.ghiChu;
 
-            // Tính tổng cộng
-            totals.canOng += item.soDoanOngCan;
-            totals.canBP += item.soMoiBPCan;
-            totals.canHan += item.tongMoiHanCan;
-            totals.lamOng += item.soDoanOngLam;
-            totals.lamBP += item.soMoiBPLam;
-            totals.lamHan += item.tongMoiHanLam;
+            totals.canOng += item.soDoanOngCan; totals.canBP += item.soMoiBPCan; totals.canHan += item.tongMoiHanCan;
+            totals.lamOng += item.soDoanOngLam; totals.lamBP += item.soMoiBPLam; totals.lamHan += item.tongMoiHanLam;
         });
 
-        // Xóa tfoot cũ
         let existingTfoot = totalDataTable.querySelector('tfoot');
         if (existingTfoot) existingTfoot.remove();
 
-        // Thêm tfoot mới
         const tfoot = document.createElement('tfoot');
         const totalRow = tfoot.insertRow();
-        totalRow.style.fontWeight = 'bold';
-        totalRow.style.backgroundColor = '#007bff';
-        totalRow.style.color = 'white';
+        totalRow.className = 'total-row';
         
         const totalPercentDoanOng = totals.canOng > 0 ? (totals.lamOng / totals.canOng * 100).toFixed(1) : 0;
         const totalPercentMoiHan = totals.canHan > 0 ? (totals.lamHan / totals.canHan * 100).toFixed(1) : 0;
@@ -382,7 +522,6 @@
         
         totalDataTable.appendChild(tfoot);
 
-        // Hiển thị nút quản lý file kế hoạch
         const fileManagement = document.getElementById('hidden-file-management');
         if (fileManagement) fileManagement.style.display = 'flex';
     }
@@ -420,11 +559,9 @@
 
         let totals = { canOng: 0, canHan: 0, canBP: 0, lamCat: 0, lamHan1: 0, lamHan2: 0, lamBP: 0, lamOng: 0 };
 
-        filteredData.forEach((item, index) => {
+        filteredData.forEach(item => {
             const row = tbody.insertRow();
-            // Lấy index trong mảng detailData
-            const detailDataIndex = detailData.findIndex(d => d.khuVuc === item.khuVuc && d.hangMuc === item.hangMuc);
-            row.onclick = () => loadRowToForm(item, detailDataIndex);
+            row.onclick = () => loadRowToForm(item);
             
             row.insertCell().textContent = sttCounter++; 
             row.insertCell().textContent = item.hangMuc; 
@@ -447,18 +584,12 @@
             
             row.insertCell().textContent = item.ghiChu || '';
 
-            // Tính tổng
-            totals.canOng += parseInt(item.khoiLuongCanLam || 0);
-            totals.canHan += parseInt(item.soMoiHanCanLam || 0);
-            totals.canBP += parseInt(item.soMoiBPCanLam || 0);
-            totals.lamCat += parseInt(item.catLam || 0);
-            totals.lamHan1 += parseInt(item.hanMoi1Lam || 0);
-            totals.lamHan2 += parseInt(item.hanMoi2Lam || 0);
-            totals.lamBP += parseInt(item.soMoiBPLam || 0);
-            totals.lamOng += parseInt(item.soDoanOngLam || 0);
+            totals.canOng += parseInt(item.khoiLuongCanLam || 0); totals.canHan += parseInt(item.soMoiHanCanLam || 0);
+            totals.canBP += parseInt(item.soMoiBPCanLam || 0); totals.lamCat += parseInt(item.catLam || 0);
+            totals.lamHan1 += parseInt(item.hanMoi1Lam || 0); totals.lamHan2 += parseInt(item.hanMoi2Lam || 0);
+            totals.lamBP += parseInt(item.soMoiBPLam || 0); totals.lamOng += parseInt(item.soDoanOngLam || 0);
         });
 
-        // Cập nhật tfoot
         tfoot.innerHTML = '';
         const footerRow = tfoot.insertRow();
         footerRow.style.fontWeight = 'bold';
@@ -487,31 +618,22 @@
         const khuVuc = document.getElementById('khuVuc').value;
         const hangMuc = document.getElementById('hangMuc').value.trim();
         
-        if (!hangMuc) {
-            alert("Hạng mục không được để trống!");
-            return;
-        }
+        if (!hangMuc) { alert("Hạng mục không được để trống!"); return; }
 
         const newData = {
-            khuVuc: khuVuc,
-            hangMuc: hangMuc,
-            duongKinh: parseFloat(document.getElementById('duongKinh').value) || 0,
+            khuVuc: khuVuc, hangMuc: hangMuc, duongKinh: parseFloat(document.getElementById('duongKinh').value) || 0,
             chieuDayDanhDinh: parseFloat(document.getElementById('chieuDayDanhDinh').value) || 0,
             chieuDayThuc: parseFloat(document.getElementById('chieuDayThuc').value) || 0,
             chieuDaiDoanOngThayThe: parseFloat(document.getElementById('chieuDaiDoanOngThayThe').value) || 0,
-            phuongAn: document.getElementById('phuongAn').value,
-            queHanSuDung: document.getElementById('queHanSuDung').value,
-            
+            phuongAn: document.getElementById('phuongAn').value, queHanSuDung: document.getElementById('queHanSuDung').value,
             khoiLuongCanLam: parseInt(document.getElementById('khoiLuongCanLam').value) || 0,
             soMoiHanCanLam: parseInt(document.getElementById('soMoiHanCanLam').value) || 0,
             soMoiBPCanLam: parseInt(document.getElementById('soMoiBPCanLam').value) || 0,
-            
             catLam: parseInt(document.getElementById('catLam').value) || 0,
             hanMoi1Lam: parseInt(document.getElementById('hanMoi1Lam').value) || 0,
             hanMoi2Lam: parseInt(document.getElementById('hanMoi2Lam').value) || 0,
             soMoiBPLam: parseInt(document.getElementById('soMoiBPLam').value) || 0,
             soDoanOngLam: parseInt(document.getElementById('soDoanOngLam').value) || 0,
-            
             ghiChu: document.getElementById('ghiChu').value.trim()
         };
 
@@ -530,25 +652,18 @@
         resetForm();
     });
 
-    function loadRowToForm(item, index) {
+    function loadRowToForm(item) {
         document.getElementById('stt').value = document.getElementById('data-body').rows.findIndex(row => row.onclick.toString().includes(item.hangMuc)) + 1;
-        document.getElementById('khuVuc').value = item.khuVuc;
-        document.getElementById('hangMuc').value = item.hangMuc;
-        document.getElementById('duongKinh').value = item.duongKinh;
-        document.getElementById('chieuDayDanhDinh').value = item.chieuDayDanhDinh;
-        document.getElementById('chieuDayThuc').value = item.chieuDayThuc;
-        document.getElementById('chieuDaiDoanOngThayThe').value = item.chieuDaiDoanOngThayThe;
-        document.getElementById('phuongAn').value = item.phuongAn;
-        document.getElementById('queHanSuDung').value = item.queHanSuDung;
+        document.getElementById('khuVuc').value = item.khuVuc; document.getElementById('hangMuc').value = item.hangMuc;
+        document.getElementById('duongKinh').value = item.duongKinh; document.getElementById('chieuDayDanhDinh').value = item.chieuDayDanhDinh;
+        document.getElementById('chieuDayThuc').value = item.chieuDayThuc; document.getElementById('chieuDaiDoanOngThayThe').value = item.chieuDaiDoanOngThayThe;
+        document.getElementById('phuongAn').value = item.phuongAn; document.getElementById('queHanSuDung').value = item.queHanSuDung;
 
-        document.getElementById('khoiLuongCanLam').value = item.khoiLuongCanLam;
-        document.getElementById('soMoiHanCanLam').value = item.soMoiHanCanLam;
+        document.getElementById('khoiLuongCanLam').value = item.khoiLuongCanLam; document.getElementById('soMoiHanCanLam').value = item.soMoiHanCanLam;
         document.getElementById('soMoiBPCanLam').value = item.soMoiBPCanLam;
 
-        document.getElementById('catLam').value = item.catLam;
-        document.getElementById('hanMoi1Lam').value = item.hanMoi1Lam;
-        document.getElementById('hanMoi2Lam').value = item.hanMoi2Lam;
-        document.getElementById('soMoiBPLam').value = item.soMoiBPLam;
+        document.getElementById('catLam').value = item.catLam; document.getElementById('hanMoi1Lam').value = item.hanMoi1Lam;
+        document.getElementById('hanMoi2Lam').value = item.hanMoi2Lam; document.getElementById('soMoiBPLam').value = item.soMoiBPLam;
         document.getElementById('soDoanOngLam').value = item.soDoanOngLam;
         
         document.getElementById('ghiChu').value = item.ghiChu;
@@ -556,40 +671,32 @@
 
     function resetForm() {
         const nextStt = document.getElementById('data-body') ? document.getElementById('data-body').rows.length + 1 : 1;
-
         document.getElementById('stt').value = nextStt;
         document.getElementById('hangMuc').value = '';
-        document.getElementById('duongKinh').value = '50.80';
-        document.getElementById('chieuDayDanhDinh').value = '4.57';
-        document.getElementById('chieuDayThuc').value = '3.41';
-        document.getElementById('chieuDaiDoanOngThayThe').value = '1.0';
-        document.getElementById('queHanSuDung').value = 'ER80S-B2';
-        document.getElementById('phuongAn').value = 'Cắt thay';
-        document.getElementById('khoiLuongCanLam').value = '1';
-        document.getElementById('soMoiHanCanLam').value = '2';
+        document.getElementById('duongKinh').value = '50.80'; document.getElementById('chieuDayDanhDinh').value = '4.57';
+        document.getElementById('chieuDayThuc').value = '3.41'; document.getElementById('chieuDaiDoanOngThayThe').value = '1.0';
+        document.getElementById('queHanSuDung').value = 'ER80S-B2'; document.getElementById('phuongAn').value = 'Cắt thay';
+        document.getElementById('khoiLuongCanLam').value = '1'; document.getElementById('soMoiHanCanLam').value = '2';
         document.getElementById('soMoiBPCanLam').value = '0';
-        document.getElementById('catLam').value = '0';
-        document.getElementById('hanMoi1Lam').value = '0';
-        document.getElementById('hanMoi2Lam').value = '0';
-        document.getElementById('soMoiBPLam').value = '0';
-        document.getElementById('soDoanOngLam').value = '0';
-        document.getElementById('ghiChu').value = '';
-        
+        document.getElementById('catLam').value = '0'; document.getElementById('hanMoi1Lam').value = '0';
+        document.getElementById('hanMoi2Lam').value = '0'; document.getElementById('soMoiBPLam').value = '0';
+        document.getElementById('soDoanOngLam').value = '0'; document.getElementById('ghiChu').value = '';
         document.getElementById('hangMuc').focus();
     }
 
     // Khởi tạo bảng tổng hợp khi DOM đã tải xong
     document.addEventListener('DOMContentLoaded', function() {
-        // Gán các hàm xử lý cho input file sau khi DOM sẵn sàng
         const planInput = document.getElementById('plan-file-input');
         if (planInput) planInput.onchange = handlePlanUpload;
         
         const detailInput = document.getElementById('detail-file-input');
         if (detailInput) detailInput.onchange = handleDetailUpload;
 
-        // Bắt đầu khởi tạo dữ liệu và giao diện
         updateTotalDataFromDetail(); 
         showTotalView();
     });
 
 </script>
+
+</body>
+</html>
