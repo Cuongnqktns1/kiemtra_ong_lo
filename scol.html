@@ -234,7 +234,7 @@
 </div>
 
 <script>
-    // DỮ LIỆU KHỞI TẠO TỔNG HỢP VÀ CHI TIẾT
+    // DỮ LIỆU KHỞI TẠO MẶC ĐỊNH
     let totalData = [
         {"khuVuc": "Quá nhiệt trung gian", "soDoanOngCan": 167, "soMoiBPCan": 141, "tongMoiHanCan": 467, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
         {"khuVuc": "Quá nhiệt cấp 1", "soDoanOngCan": 97, "soMoiBPCan": 180, "tongMoiHanCan": 373, "soDoanOngLam": 0, "soMoiBPLam": 0, "tongMoiHanLam": 0, "ghiChu": ""},
@@ -256,10 +256,37 @@
     // ************************************************************
     function checkXLSXLibrary() {
         if (typeof XLSX === 'undefined') {
-            alert("LỖI KHÔNG TẢI ĐƯỢC THƯ VIỆN: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng thực hiện HƯỚNG DẪN QUAN TRỌNG ở đầu file HTML để tải file thư viện về máy.");
+            alert("LỖI KHÔNG TẢI ĐƯỢC THƯ VIỆN: Không tìm thấy thư viện XLSX (SheetJS). Vui lòng kiểm tra kết nối mạng hoặc đường dẫn thư viện.");
             return false;
         }
         return true;
+    }
+    
+    // ************************************************************
+    // CHỨC NĂNG LƯU TRỮ CỤC BỘ (LOCALSTORAGE)
+    // ************************************************************
+    function loadDataFromLocalStorage() {
+        const savedTotal = localStorage.getItem('totalDataBoiler1');
+        const savedDetail = localStorage.getItem('detailDataBoiler1');
+
+        if (savedTotal && savedDetail) {
+            try {
+                totalData = JSON.parse(savedTotal);
+                detailData = JSON.parse(savedDetail);
+                console.log("Đã tải dữ liệu từ LocalStorage.");
+            } catch (e) {
+                console.error("Lỗi khi phân tích dữ liệu từ LocalStorage:", e);
+                // Nếu lỗi, sử dụng dữ liệu mặc định
+            }
+        } else {
+            console.log("Sử dụng dữ liệu mặc định.");
+        }
+    }
+
+    function saveDataToLocalStorage() {
+        localStorage.setItem('totalDataBoiler1', JSON.stringify(totalData));
+        localStorage.setItem('detailDataBoiler1', JSON.stringify(detailData));
+        console.log("Đã lưu dữ liệu vào LocalStorage.");
     }
 
 
@@ -305,7 +332,7 @@
                     !existingKhuVucNames.includes(old.khuVuc) && (old.soDoanOngLam > 0 || old.tongMoiHanLam > 0)
                 ));
 
-                updateTotalDataFromDetail(); 
+                updateTotalDataFromDetail(); // Hàm này gọi saveDataToLocalStorage()
                 showTotalView();
                 alert(`Đã tải thành công và cập nhật ${totalData.length} khu vực KẾ HOẠCH!`);
             } catch (error) {
@@ -330,6 +357,7 @@
         reader.onload = function(e) {
             try {
                 const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                // Giả định bảng chi tiết bắt đầu từ hàng thứ 4 (index 3)
                 const aoa = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, range: 0, raw: false, defval: "" });
                 const dataRows = aoa.slice(3); 
                 
@@ -342,6 +370,7 @@
 
                 dataRows.forEach(row => {
                     const hangMuc = getString(row, 3);
+                    // Bỏ qua nếu không có hạng mục hoặc không có kế hoạch
                     if (!hangMuc || (getInt(row, 10) === 0 && getInt(row, 11) === 0)) return; 
                     importedData.push({
                         khuVuc: khuVucHienTai, hangMuc: hangMuc, duongKinh: getFloat(row, 4), chieuDayDanhDinh: getFloat(row, 5), 
@@ -353,10 +382,11 @@
                     });
                 });
 
+                // Xóa dữ liệu cũ của khu vực hiện tại và thêm dữ liệu mới
                 detailData = detailData.filter(item => item.khuVuc !== khuVucHienTai);
                 detailData.push(...importedData); 
 
-                updateTotalDataFromDetail(); 
+                updateTotalDataFromDetail(); // Hàm này gọi saveDataToLocalStorage()
                 if(document.getElementById('view-detail').style.display === 'block') applyDetailFilters(); else showTotalView();
                 
                 alert(`Đã tải thành công và GHI ĐÈ ${importedData.length} mục dữ liệu CHI TIẾT cho khu vực ${khuVucHienTai}!`);
@@ -404,12 +434,15 @@
                 summaryMapFromDetail[khuVuc] = { soDoanOngLam: 0, soMoiBPLam: 0, tongMoiHanLam: 0 };
             }
             
+            // Tính tổng Kế hoạch CẦN LÀM từ chi tiết
             planMapFromDetail[khuVuc].soDoanOngCan += parseInt(item.khoiLuongCanLam || 0);
             planMapFromDetail[khuVuc].soMoiBPCan += parseInt(item.soMoiBPCanLam || 0); 
             planMapFromDetail[khuVuc].tongMoiHanCan += parseInt(item.soMoiHanCanLam || 0);
 
+            // Tính tổng ĐÃ LÀM từ chi tiết
             summaryMapFromDetail[khuVuc].soDoanOngLam += parseInt(item.soDoanOngLam || 0);
             summaryMapFromDetail[khuVuc].soMoiBPLam += parseInt(item.soMoiBPLam || 0);
+            // Tổng mối hàn đã làm = Cắt + Hàn Mối 1 + Hàn Mối 2
             summaryMapFromDetail[khuVuc].tongMoiHanLam += parseInt(item.catLam || 0) + parseInt(item.hanMoi1Lam || 0) + parseInt(item.hanMoi2Lam || 0); 
         });
 
@@ -425,22 +458,25 @@
             
             const hasDetailPlan = planFromDetail && (planFromDetail.soDoanOngCan > 0 || planFromDetail.tongMoiHanCan > 0);
             
-            if (hasDetailPlan) {
+            // Ưu tiên KẾ HOẠCH từ file Import tổng hợp. Nếu không có file Import tổng hợp, lấy từ chi tiết.
+            if (existingItem && existingItem.soDoanOngCan > 0) {
+                 updatedItem.soDoanOngCan = existingItem.soDoanOngCan;
+                 updatedItem.soMoiBPCan = existingItem.soMoiBPCan;
+                 updatedItem.tongMoiHanCan = existingItem.tongMoiHanCan;
+            } else if (hasDetailPlan) {
                 updatedItem.soDoanOngCan = planFromDetail.soDoanOngCan;
                 updatedItem.soMoiBPCan = planFromDetail.soMoiBPCan;
                 updatedItem.tongMoiHanCan = planFromDetail.tongMoiHanCan;
-            } else if (existingItem) {
-                updatedItem.soDoanOngCan = existingItem.soDoanOngCan;
-                updatedItem.soMoiBPCan = existingItem.soMoiBPCan;
-                updatedItem.tongMoiHanCan = existingItem.tongMoiHanCan;
             } else {
                 updatedItem.soDoanOngCan = 0; updatedItem.soMoiBPCan = 0; updatedItem.tongMoiHanCan = 0;
             }
 
+            // Lấy khối lượng ĐÃ LÀM từ chi tiết (luôn ưu tiên)
             updatedItem.soDoanOngLam = summary.soDoanOngLam;
             updatedItem.soMoiBPLam = summary.soMoiBPLam;
             updatedItem.tongMoiHanLam = summary.tongMoiHanLam;
 
+            // Loại bỏ các khu vực không có kế hoạch CẦN và không có khối lượng ĐÃ LÀM
             if (updatedItem.soDoanOngCan === 0 && updatedItem.tongMoiHanCan === 0 && updatedItem.soDoanOngLam === 0 && updatedItem.tongMoiHanLam === 0) return;
 
             newTotalData.push(updatedItem);
@@ -448,6 +484,7 @@
 
         totalData = newTotalData;
         renderTotalTable();
+        saveDataToLocalStorage(); // LƯU DỮ LIỆU SAU MỖI LẦN TÍNH TOÁN TỔNG HỢP
     }
 
 
@@ -591,114 +628,157 @@
 
         tfoot.innerHTML = '';
         const footerRow = tfoot.insertRow();
-        footerRow.style.fontWeight = 'bold';
-        footerRow.style.backgroundColor = '#f1f1f1';
-        
-        footerRow.insertCell().textContent = ''; 
-        footerRow.insertCell().textContent = 'TỔNG CỘNG';
-        footerRow.insertCell().colSpan = 6; 
-        
+        footerRow.className = 'total-row';
+
+        // Số cột trước phần Kế Hoạch CẦN LÀM là 8 (STT, Hạng Mục, 6 cột Thông số/Phương án)
+        footerRow.insertCell().textContent = ""; // STT
+        footerRow.insertCell().textContent = "TỔNG CỘNG"; // Hạng Mục
+        footerRow.insertCell().colSpan = 6; // ĐK, CD DĐ, CD Thực, CD Thay, Phương án, Que hàn
+        footerRow.cells[1].colSpan = 1; 
+        footerRow.cells[2].colSpan = 6;
+
+        // Kế Hoạch CẦN LÀM (3 cột)
         footerRow.insertCell().textContent = totals.canOng;
         footerRow.insertCell().textContent = totals.canHan;
         footerRow.insertCell().textContent = totals.canBP;
-        
+
+        // Khối Lượng ĐÃ LÀM (5 cột)
         footerRow.insertCell().textContent = totals.lamCat;
         footerRow.insertCell().textContent = totals.lamHan1;
         footerRow.insertCell().textContent = totals.lamHan2;
         footerRow.insertCell().textContent = totals.lamBP;
         footerRow.insertCell().textContent = totals.lamOng;
 
-        footerRow.insertCell().textContent = ''; 
+        // Ghi Chú (1 cột)
+        footerRow.insertCell().textContent = "";
 
+        document.getElementById('detail-data-table').appendChild(tfoot);
+
+        // Cập nhật STT tiếp theo
         document.getElementById('stt').value = filteredData.length + 1;
     }
 
     function loadRowToForm(item) {
-        document.getElementById('stt').value = document.getElementById('data-body').rows.findIndex(row => row.onclick.toString().includes(item.hangMuc)) + 1;
-        document.getElementById('khuVuc').value = item.khuVuc; document.getElementById('hangMuc').value = item.hangMuc;
-        document.getElementById('duongKinh').value = item.duongKinh; document.getElementById('chieuDayDanhDinh').value = item.chieuDayDanhDinh;
-        document.getElementById('chieuDayThuc').value = item.chieuDayThuc; document.getElementById('chieuDaiDoanOngThayThe').value = item.chieuDaiDoanOngThayThe;
-        document.getElementById('phuongAn').value = item.phuongAn; document.getElementById('queHanSuDung').value = item.queHanSuDung;
+        // Tìm STT trong danh sách đã lọc (chỉ để hiển thị cho người dùng)
+        const currentKhuVucDetails = detailData.filter(d => d.khuVuc === item.khuVuc);
+        const sttInView = currentKhuVucDetails.findIndex(d => d.hangMuc === item.hangMuc) + 1;
+        
+        document.getElementById('stt').value = sttInView;
+        document.getElementById('hangMuc').value = item.hangMuc;
+        document.getElementById('khuVuc').value = item.khuVuc;
+        document.getElementById('duongKinh').value = item.duongKinh;
+        document.getElementById('chieuDayDanhDinh').value = item.chieuDayDanhDinh;
+        document.getElementById('chieuDayThuc').value = item.chieuDayThuc;
+        document.getElementById('chieuDaiDoanOngThayThe').value = item.chieuDaiDoanOngThayThe;
+        document.getElementById('phuongAn').value = item.phuongAn;
+        document.getElementById('queHanSuDung').value = item.queHanSuDung;
 
-        document.getElementById('khoiLuongCanLam').value = item.khoiLuongCanLam; document.getElementById('soMoiHanCanLam').value = item.soMoiHanCanLam;
+        document.getElementById('khoiLuongCanLam').value = item.khoiLuongCanLam;
+        document.getElementById('soMoiHanCanLam').value = item.soMoiHanCanLam;
         document.getElementById('soMoiBPCanLam').value = item.soMoiBPCanLam;
 
-        document.getElementById('catLam').value = item.catLam; document.getElementById('hanMoi1Lam').value = item.hanMoi1Lam;
-        document.getElementById('hanMoi2Lam').value = item.hanMoi2Lam; document.getElementById('soMoiBPLam').value = item.soMoiBPLam;
+        document.getElementById('catLam').value = item.catLam;
+        document.getElementById('hanMoi1Lam').value = item.hanMoi1Lam;
+        document.getElementById('hanMoi2Lam').value = item.hanMoi2Lam;
+        document.getElementById('soMoiBPLam').value = item.soMoiBPLam;
         document.getElementById('soDoanOngLam').value = item.soDoanOngLam;
-        
         document.getElementById('ghiChu').value = item.ghiChu;
+        document.getElementById('add-row-btn').textContent = 'Cập Nhật Mục Đã Chọn';
     }
 
     function resetForm() {
-        const nextStt = document.getElementById('data-body') ? document.getElementById('data-body').rows.length + 1 : 1;
-        document.getElementById('stt').value = nextStt;
+        document.getElementById('stt').value = detailData.filter(item => item.khuVuc === currentDetailKhuVuc).length + 1;
         document.getElementById('hangMuc').value = '';
-        document.getElementById('duongKinh').value = '50.80'; document.getElementById('chieuDayDanhDinh').value = '4.57';
-        document.getElementById('chieuDayThuc').value = '3.41'; document.getElementById('chieuDaiDoanOngThayThe').value = '1.0';
-        document.getElementById('queHanSuDung').value = 'ER80S-B2'; document.getElementById('phuongAn').value = 'Cắt thay';
-        document.getElementById('khoiLuongCanLam').value = '1'; document.getElementById('soMoiHanCanLam').value = '2';
+        document.getElementById('duongKinh').value = '50.80';
+        document.getElementById('chieuDayDanhDinh').value = '4.57';
+        document.getElementById('chieuDayThuc').value = '3.41';
+        document.getElementById('chieuDaiDoanOngThayThe').value = '1.0';
+        document.getElementById('phuongAn').value = 'Cắt thay';
+        document.getElementById('queHanSuDung').value = 'ER80S-B2';
+
+        document.getElementById('khoiLuongCanLam').value = '1';
+        document.getElementById('soMoiHanCanLam').value = '2';
         document.getElementById('soMoiBPCanLam').value = '0';
-        document.getElementById('catLam').value = '0'; document.getElementById('hanMoi1Lam').value = '0';
-        document.getElementById('hanMoi2Lam').value = '0'; document.getElementById('soMoiBPLam').value = '0';
-        document.getElementById('soDoanOngLam').value = '0'; document.getElementById('ghiChu').value = '';
-        document.getElementById('hangMuc').focus();
+
+        document.getElementById('catLam').value = '0';
+        document.getElementById('hanMoi1Lam').value = '0';
+        document.getElementById('hanMoi2Lam').value = '0';
+        document.getElementById('soMoiBPLam').value = '0';
+        document.getElementById('soDoanOngLam').value = '0';
+        document.getElementById('ghiChu').value = '';
+
+        document.getElementById('add-row-btn').textContent = 'Lưu (Thêm mới/Cập nhật)';
     }
 
-    // Khởi tạo bảng tổng hợp khi DOM đã tải xong
-    document.addEventListener('DOMContentLoaded', function() {
-        // Gán các hàm xử lý cho input file sau khi DOM sẵn sàng
-        const planInput = document.getElementById('plan-file-input');
-        if (planInput) planInput.onchange = handlePlanUpload;
-        
-        const detailInput = document.getElementById('detail-file-input');
-        if (detailInput) detailInput.onchange = handleDetailUpload;
+    function handleAddOrUpdateRow() {
+        const khuVuc = document.getElementById('khuVuc').value.trim();
+        const hangMuc = document.getElementById('hangMuc').value.trim();
 
-        // **ĐÃ SỬA LỖI (TypeError) bằng cách chuyển AddEventListener vào trong DOMContentLoaded**
-        document.getElementById('add-row-btn').addEventListener('click', () => {
-            const khuVuc = document.getElementById('khuVuc').value;
-            const hangMuc = document.getElementById('hangMuc').value.trim();
-            
-            if (!hangMuc) { alert("Hạng mục không được để trống!"); return; }
+        if (!hangMuc) {
+            alert("Vui lòng nhập Hạng Mục.");
+            return;
+        }
 
-            const newData = {
-                khuVuc: khuVuc, hangMuc: hangMuc, duongKinh: parseFloat(document.getElementById('duongKinh').value) || 0,
-                chieuDayDanhDinh: parseFloat(document.getElementById('chieuDayDanhDinh').value) || 0,
-                chieuDayThuc: parseFloat(document.getElementById('chieuDayThuc').value) || 0,
-                chieuDaiDoanOngThayThe: parseFloat(document.getElementById('chieuDaiDoanOngThayThe').value) || 0,
-                phuongAn: document.getElementById('phuongAn').value, queHanSuDung: document.getElementById('queHanSuDung').value,
-                khoiLuongCanLam: parseInt(document.getElementById('khoiLuongCanLam').value) || 0,
-                soMoiHanCanLam: parseInt(document.getElementById('soMoiHanCanLam').value) || 0,
-                soMoiBPCanLam: parseInt(document.getElementById('soMoiBPCanLam').value) || 0,
-                catLam: parseInt(document.getElementById('catLam').value) || 0,
-                hanMoi1Lam: parseInt(document.getElementById('hanMoi1Lam').value) || 0,
-                hanMoi2Lam: parseInt(document.getElementById('hanMoi2Lam').value) || 0,
-                soMoiBPLam: parseInt(document.getElementById('soMoiBPLam').value) || 0,
-                soDoanOngLam: parseInt(document.getElementById('soDoanOngLam').value) || 0,
-                ghiChu: document.getElementById('ghiChu').value.trim()
-            };
+        const newData = {
+            khuVuc: khuVuc,
+            hangMuc: hangMuc,
+            duongKinh: parseFloat(document.getElementById('duongKinh').value) || 0,
+            chieuDayDanhDinh: parseFloat(document.getElementById('chieuDayDanhDinh').value) || 0,
+            chieuDayThuc: parseFloat(document.getElementById('chieuDayThuc').value) || 0,
+            chieuDaiDoanOngThayThe: parseFloat(document.getElementById('chieuDaiDoanOngThayThe').value) || 0,
+            phuongAn: document.getElementById('phuongAn').value.trim(),
+            queHanSuDung: document.getElementById('queHanSuDung').value.trim(),
+            khoiLuongCanLam: parseInt(document.getElementById('khoiLuongCanLam').value) || 0,
+            soMoiHanCanLam: parseInt(document.getElementById('soMoiHanCanLam').value) || 0,
+            soMoiBPCanLam: parseInt(document.getElementById('soMoiBPCanLam').value) || 0,
+            catLam: parseInt(document.getElementById('catLam').value) || 0,
+            hanMoi1Lam: parseInt(document.getElementById('hanMoi1Lam').value) || 0,
+            hanMoi2Lam: parseInt(document.getElementById('hanMoi2Lam').value) || 0,
+            soMoiBPLam: parseInt(document.getElementById('soMoiBPLam').value) || 0,
+            soDoanOngLam: parseInt(document.getElementById('soDoanOngLam').value) || 0,
+            ghiChu: document.getElementById('ghiChu').value.trim()
+        };
 
-            const existingIndex = detailData.findIndex(item => item.khuVuc === khuVuc && item.hangMuc === hangMuc);
+        const index = detailData.findIndex(item => item.khuVuc === khuVuc && item.hangMuc === hangMuc);
 
-            if (existingIndex !== -1) {
-                detailData[existingIndex] = newData;
-                alert(`Đã CẬP NHẬT tiến độ cho hạng mục: ${hangMuc}`);
-            } else {
-                detailData.push(newData);
-                alert(`Đã THÊM MỚI hạng mục: ${hangMuc}`);
+        if (index !== -1) {
+            detailData[index] = newData; // Cập nhật mục đã tồn tại
+        } else {
+            // Thêm mới mục
+            const totalIndex = totalData.findIndex(item => item.khuVuc === khuVuc);
+            if (totalIndex === -1) {
+                // Thêm khu vực mới vào totalData nếu chưa có
+                totalData.push({
+                    khuVuc: khuVuc,
+                    soDoanOngCan: 0, soMoiBPCan: 0, tongMoiHanCan: 0,
+                    soDoanOngLam: 0, soMoiBPLam: 0, tongMoiHanLam: 0,
+                    ghiChu: ""
+                });
             }
+            detailData.push(newData);
+        }
 
-            updateTotalDataFromDetail();
-            applyDetailFilters();
-            resetForm();
-        });
+        updateTotalDataFromDetail(); // Hàm này gọi saveDataToLocalStorage()
+        applyDetailFilters();
+        resetForm();
+        alert(`Đã lưu/cập nhật thành công hạng mục: ${hangMuc}`);
+    }
 
-        // Bắt đầu khởi tạo dữ liệu và giao diện
-        updateTotalDataFromDetail(); 
+
+    // ************************************************************
+    // ĐĂNG KÝ SỰ KIỆN VÀ KHỞI TẠO
+    // ************************************************************
+    document.addEventListener('DOMContentLoaded', () => {
+        // TẢI DỮ LIỆU TỪ LOCALSTORAGE KHI TRANG LOAD
+        loadDataFromLocalStorage(); 
+        
+        document.getElementById('plan-file-input').addEventListener('change', handlePlanUpload);
+        document.getElementById('detail-file-input').addEventListener('change', handleDetailUpload);
+        document.getElementById('add-row-btn').addEventListener('click', handleAddOrUpdateRow);
+        
+        // Hiển thị bảng tổng hợp
         showTotalView();
     });
-
 </script>
-
 </body>
 </html>
